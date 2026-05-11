@@ -141,10 +141,81 @@ CREATE TABLE IF NOT EXISTS campaign_notes (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_campaigns_dm ON campaigns(dm_discord_id);
-CREATE INDEX IF NOT EXISTS idx_characters_player ON characters(player_discord_id);
-CREATE INDEX IF NOT EXISTS idx_characters_campaign ON characters(campaign_id);
-CREATE INDEX IF NOT EXISTS idx_encounters_campaign ON encounters(campaign_id);
-CREATE INDEX IF NOT EXISTS idx_session_logs_campaign ON session_logs(campaign_id);
-CREATE INDEX IF NOT EXISTS idx_campaign_players_campaign ON campaign_players(campaign_id);
+CREATE TABLE IF NOT EXISTS custom_content (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+  author_discord_id TEXT,
+  type TEXT NOT NULL CHECK(type IN ('monster','spell','item','npc','location','encounter','loot_table')),
+  name TEXT NOT NULL,
+  data JSON NOT NULL DEFAULT '{}',
+  tags TEXT DEFAULT '[]',
+  is_shared INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS adventure_modules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+  author_discord_id TEXT,
+  title TEXT NOT NULL,
+  description TEXT,
+  min_level INTEGER DEFAULT 1,
+  max_level INTEGER DEFAULT 20,
+  setting TEXT,
+  scenes JSON NOT NULL DEFAULT '[]',
+  variables JSON DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS adventure_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  module_id INTEGER NOT NULL REFERENCES adventure_modules(id) ON DELETE CASCADE,
+  campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+  dm_discord_id TEXT NOT NULL,
+  state TEXT DEFAULT 'not_started' CHECK(state IN ('not_started','running','paused','completed','abandoned')),
+  current_scene_id TEXT,
+  variables JSON DEFAULT '{}',
+  history JSON DEFAULT '[]',
+  player_states JSON DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS source_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  author TEXT,
+  source_type TEXT DEFAULT 'pdf' CHECK(source_type IN ('pdf','text','json','url')),
+  raw_text TEXT,
+  chapters JSON DEFAULT '[]',
+  npcs JSON DEFAULT '[]',
+  locations JSON DEFAULT '[]',
+  encounters JSON DEFAULT '[]',
+  items JSON DEFAULT '[]',
+  monsters JSON DEFAULT '[]',
+  summary TEXT,
+  parsed_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS document_chapters (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  document_id INTEGER NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  chapter_number INTEGER,
+  content TEXT,
+  scenes JSON DEFAULT '[]',
+  is_dm_section INTEGER DEFAULT 0,
+  metadata JSON DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_content_campaign ON custom_content(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_custom_content_type ON custom_content(type);
+CREATE INDEX IF NOT EXISTS idx_adventure_modules_campaign ON adventure_modules(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_adventure_sessions_module ON adventure_sessions(module_id);
+CREATE INDEX IF NOT EXISTS idx_source_documents_campaign ON source_documents(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_document_chapters_document ON document_chapters(document_id);
 `;

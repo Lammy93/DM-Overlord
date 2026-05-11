@@ -21,6 +21,10 @@ export default {
   database: {
     path: process.env.DATABASE_PATH || join(__dirname, '..', 'data', 'dm-overlord.db'),
   },
+  ai: {
+    openaiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.AI_MODEL || 'gpt-4o-mini',
+  },
   narration: {
     style: process.env.NARRATION_STYLE || 'descriptive',
   },

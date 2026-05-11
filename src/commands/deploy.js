@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 async function loadAllCommands() {
   const commands = [];
   const cmdFiles = [
-    './roll.js', './obsidian.js', './srd-cmd.js',
+    './roll.js', './obsidian.js', './srd-cmd.js', './import-cmd.js', './adventure.js',
     './campaign/campaign.js', './character/character.js', './encounter/encounter.js',
   ];
   for (const file of cmdFiles) {

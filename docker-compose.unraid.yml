@@ -12,6 +12,8 @@ services:
       - GUILD_ID=${GUILD_ID}
       - NARRATION_STYLE=${NARRATION_STYLE:-descriptive}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-4o-mini}
       - OBSIDIAN_VAULT_PATH=/vault
       - OBSIDIAN_SUBFOLDER=DM-Overlord
       - DATABASE_PATH=/app/data/dm-overlord.db
