@@ -4,37 +4,37 @@ A Discord bot that serves as your **Dungeon Master assistant** for running D&D 5
 
 ## Features
 
-### 🎲 Dice Rolling
+### Dice Rolling
 - Standard notation (`1d20`, `2d6+3`)
 - Advantage/disadvantage on d20 rolls
 - Hidden rolls (DM-only)
 
-### 📜 Campaign Management
+### Campaign Management
 - Create and manage multiple campaigns
 - Player invites with roles (player, co-dm, observer)
 - Session logging with summaries, highlights, and loot
 - Campaign notes with categories
 
-### 🧙 Character Sheets
+### Character Sheets
 - Create characters with race, class, stats, and more
 - Track HP, AC, XP, inventory, and currency
 - Damage/heal tracking
 - Level up with XP tracking
 
-### ⚔️ Encounter Builder & Combat Tracker
+### Encounter Builder & Combat Tracker
 - Build encounters from SRD monster database
 - Custom combatants (homebrew monsters, NPCs, allies)
 - Full combat tracker with turn order
 - HP tracking, conditions, auto-initiative
 - DM narration flavor text for hits, crits, kills
 
-### 📖 SRD Content Database
+### SRD Content Database
 - **Monsters**: 20+ SRD monsters with full stats, actions, and traits
 - **Spells**: 25+ SRD spells with descriptions, components, and class lists
 - **Items**: Armor, weapons, magic items, potions
 - **Classes & Races**: Full SRD class and race data with subraces
 
-### 📝 Obsidian Vault Integration
+### Obsidian Vault Integration
 - Sync campaigns, characters, sessions, and encounters directly to your Obsidian vault
 - Auto-generated Markdown notes with proper formatting
 - Organized folder structure: `Campaigns/`, `Characters/`, `Sessions/`, `Encounters/`
@@ -67,106 +67,182 @@ A Discord bot that serves as your **Dungeon Master assistant** for running D&D 5
 | `/obsidian sync-campaign` | Sync campaign to vault |
 | `/obsidian sync-character` | Sync character sheet to vault |
 
-## Setup
+## Quick Start (Docker — Recommended)
 
 ### Prerequisites
-- Node.js 18+ or Docker
-- A Discord Application (from https://discord.dev)
+- Docker (Docker Desktop on Windows/Mac, or Unraid's built-in Docker)
+- A Discord Application from https://discord.com/developers/applications
 
 ### Discord Bot Setup
 1. Go to https://discord.com/developers/applications
-2. Create a new application → Bot → Create Bot
-3. Copy the **Token** and **Client ID**
-4. Enable these Privileged Gateway Intents:
-   - `MESSAGE CONTENT INTENT`
-   - `SERVER MEMBERS INTENT` (optional)
+2. Click **New Application** → give it a name
+3. Go to **Bot** tab → **Create Bot**
+4. Copy the **Token** and **Client ID**
+5. Enable **Message Content Intent** under Privileged Gateway Intents
+6. Go to **OAuth2** → **URL Generator** → select `bot` + `applications.commands` → copy the generated URL and open it in your browser to add the bot to your server
 
-### Installation
+### Option A: Run with docker-compose (easiest)
 
-1. Clone the repo:
 ```bash
-git clone <repo-url>
+git clone https://github.com/Lammy93/DM-Overlord.git
 cd DM-Overlord
-```
 
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Configure environment:
-```bash
+# Create env file with your tokens
 cp .env.example .env
-# Edit .env with your Discord token and Obsidian vault path
+# Edit .env — set DISCORD_TOKEN, CLIENT_ID, GUILD_ID
+
+# Start the bot
+docker compose up -d
 ```
 
-4. Deploy slash commands:
+### Option B: Run with docker run
+
 ```bash
+docker run -d --name dm-overlord --restart unless-stopped \
+  -e DISCORD_TOKEN=your_token \
+  -e CLIENT_ID=your_client_id \
+  -e GUILD_ID=your_server_id \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/lammy93/dm-overlord:latest
+```
+
+### Register Slash Commands
+
+After starting, run this once so Discord knows about the commands:
+
+```bash
+docker exec dm-overlord node src/commands/deploy.js
+```
+
+Your bot should now respond to `/roll 1d20`, `/campaign create`, etc.
+
+## Quick Start (Local — Node.js)
+
+```bash
+git clone https://github.com/Lammy93/DM-Overlord.git
+cd DM-Overlord
+
+cp .env.example .env
+# Edit .env — set DISCORD_TOKEN, CLIENT_ID, GUILD_ID
+
+npm install
 npm run deploy
-```
-
-5. Start the bot:
-```bash
 npm start
 ```
 
-### Docker
-```bash
-docker build -t dm-overlord .
-docker run -d \
-  --name dm-overlord \
-  -e DISCORD_TOKEN=your_token \
-  -e CLIENT_ID=your_client_id \
-  -v /path/to/data:/app/data \
-  -v /path/to/obsidian-vault:/vault:ro \
-  dm-overlord
+## Unraid Setup
+
+### Via Docker Compose (recommended for Unraid)
+
+1. Install the **Compose Manager** plugin from Unraid's Community Apps
+2. Create a new stack and paste the contents of `docker-compose.unraid.yml` from the repo
+3. Set your environment variables (DISCORD_TOKEN, CLIENT_ID, GUILD_ID)
+4. Click **Compose Up**
+
+The bot will pull `ghcr.io/lammy93/dm-overlord:latest` automatically.
+
+### Via Docker UI
+
+1. **Docker** tab → **Add Container**
+2. Repository: `ghcr.io/lammy93/dm-overlord:latest`
+3. Add variables:
+
+| Key | Value |
+|-----|-------|
+| `DISCORD_TOKEN` | Your bot token |
+| `CLIENT_ID` | Your app client ID |
+| `GUILD_ID` | Your Discord server ID |
+
+4. Click **Apply**
+
+## Obsidian Vault Integration
+
+1. Create an `.env` file with your Obsidian vault path:
+
+```env
+OBSIDIAN_VAULT_PATH=/path/to/your/obsidian-vault
 ```
 
-### Obsidian Vault Setup
-1. Set `OBSIDIAN_VAULT_PATH` in `.env` to your vault's absolute path
-2. The bot will auto-create `DM-Overlord/` subfolder with subdirectories
-3. Use `/obsidian status` to verify connection
-4. (Optional) Install the DM-Overlord plugin from the `obsidian-plugin/` folder
+2. When using Docker, mount the vault as a volume:
 
-### Environment Variables
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DISCORD_TOKEN` | Yes | Discord bot token |
-| `CLIENT_ID` | Yes | Discord application ID |
-| `GUILD_ID` | No | Guild ID for instant command registration |
-| `OBSIDIAN_VAULT_PATH` | No | Absolute path to Obsidian vault |
-| `NARRATION_STYLE` | No | descriptive, cinematic, minimal, or humorous |
+```yaml
+volumes:
+  - /path/to/your/obsidian-vault:/vault:ro
+```
+
+3. Use `/obsidian status` in Discord to verify the connection
+4. Use `/obsidian sync-campaign`, `/obsidian sync-character` etc. to write notes
+
+The bot will auto-create a `DM-Overlord/` folder in your vault with subdirectories: `Campaigns/`, `Characters/`, `Sessions/`, `Encounters/`.
+
+### Obsidian Plugin (Optional)
+
+Copy the `obsidian-plugin/` folder into your vault's `.obsidian/plugins/` directory and enable it in Obsidian settings. Provides commands to create character templates and session notes directly from Obsidian.
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DISCORD_TOKEN` | Yes | - | Discord bot token |
+| `CLIENT_ID` | Yes | - | Discord application ID |
+| `GUILD_ID` | No | - | Server ID for instant command registration |
+| `OBSIDIAN_VAULT_PATH` | No | - | Absolute path to your Obsidian vault |
+| `OBSIDIAN_SUBFOLDER` | No | `DM-Overlord` | Subfolder in vault for notes |
+| `NARRATION_STYLE` | No | `descriptive` | descriptive, cinematic, minimal, or humorous |
+| `LOG_LEVEL` | No | `info` | debug, info, warn, error |
+
+## Updating
+
+### Docker (docker-compose)
+```bash
+git pull
+docker compose pull
+docker compose up -d
+```
+
+### Docker (docker run)
+```bash
+docker pull ghcr.io/lammy93/dm-overlord:latest
+docker stop dm-overlord
+docker rm dm-overlord
+# re-run the docker run command from above
+```
+
+### Local (Node.js)
+```bash
+git pull
+npm install
+node src/commands/deploy.js
+npm start
+```
 
 ## Project Structure
+
 ```
 DM-Overlord/
 ├── src/
 │   ├── index.js              # Entry point
 │   ├── config.js             # Configuration
-│   ├── client.js             # Discord client
-│   ├── commands/             # Slash commands
-│   │   ├── roll.js
-│   │   ├── campaign.js
-│   │   ├── character.js
-│   │   ├── encounter.js
-│   │   ├── obsidian.js
-│   │   └── srd-cmd.js
-│   ├── events/               # Event handlers
-│   ├── services/             # Business logic
-│   │   ├── dice.js
-│   │   ├── campaign.js
-│   │   ├── character.js
-│   │   ├── encounter.js
-│   │   ├── obsidian.js
-│   │   ├── srd.js
-│   │   └── narration.js
-│   ├── db/                   # Database layer
-│   ├── data/                 # SRD content & templates
-│   └── utils/                # Helpers
+│   ├── client.js             # Discord client setup
+│   ├── commands/             # Slash command definitions
+│   │   ├── roll.js           # Dice rolling
+│   │   ├── campaign/         # Campaign management
+│   │   ├── character/        # Character sheets
+│   │   ├── encounter/        # Combat encounters
+│   │   ├── obsidian.js       # Obsidian vault sync
+│   │   └── srd-cmd.js        # SRD content lookup
+│   ├── events/               # Discord event handlers
+│   ├── services/             # Business logic layer
+│   ├── db/                   # SQLite database
+│   ├── data/                 # SRD JSON data + templates
+│   └── utils/                # Helpers (embeds, formatters)
 ├── obsidian-plugin/          # Obsidian vault plugin
-├── Dockerfile
+├── docker-compose.yml        # Docker compose config
+├── docker-compose.unraid.yml # Unraid-specific compose
+├── Dockerfile                # Docker build
 └── package.json
 ```
 
 ## License
+
 MIT
