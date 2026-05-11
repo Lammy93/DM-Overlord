@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  dm-overlord:
+    build: .
+    container_name: dm-overlord
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - GUILD_ID=${GUILD_ID}
+      - OBSIDIAN_VAULT_PATH=/vault
+      - OBSIDIAN_SUBFOLDER=DM-Overlord
+      - NARRATION_STYLE=${NARRATION_STYLE:-descriptive}
+      - DATABASE_PATH=/app/data/dm-overlord.db
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./data:/app/data
+      - ${OBSIDIAN_VAULT_PATH}:/vault:ro

@@ -1,0 +1,10 @@
+{
+  "id": "dm-overlord-sync",
+  "name": "DM Overlord Sync",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Sync D&D campaign data, characters, sessions, and encounters from the DM Overlord Discord bot into your vault.",
+  "author": "DM Overlord",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
