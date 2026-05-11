@@ -212,6 +212,31 @@ CREATE TABLE IF NOT EXISTS document_chapters (
   metadata JSON DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS session_auto_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_log_id INTEGER NOT NULL REFERENCES session_logs(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK(type IN ('narrative','combat','interaction','character_update','loot','note','milestone','roll','location_change')),
+  title TEXT,
+  content TEXT,
+  author_discord_id TEXT,
+  author_username TEXT,
+  is_dm_only INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS session_active (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  session_log_id INTEGER NOT NULL REFERENCES session_logs(id) ON DELETE CASCADE,
+  is_logging INTEGER DEFAULT 1,
+  channel_id TEXT,
+  started_by_discord_id TEXT NOT NULL,
+  started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(campaign_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_auto_logs_session ON session_auto_logs(session_log_id);
+CREATE INDEX IF NOT EXISTS idx_session_auto_logs_type ON session_auto_logs(type);
 CREATE INDEX IF NOT EXISTS idx_custom_content_campaign ON custom_content(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_custom_content_type ON custom_content(type);
 CREATE INDEX IF NOT EXISTS idx_adventure_modules_campaign ON adventure_modules(campaign_id);

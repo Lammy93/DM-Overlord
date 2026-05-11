@@ -98,7 +98,9 @@ export function deleteCharacter(id) {
 export function addExperience(id, amount) {
   const db = getDb();
   db.prepare('UPDATE characters SET experience = experience + ? WHERE id = ?').run(amount, id);
-  return getCharacter(id);
+  const character = getCharacter(id);
+  tryAutoLog(character?.campaign_id, 'character_update', `${character?.name || 'Character'} gained ${amount} XP`, `Total XP: ${character?.experience || 0}`, null);
+  return character;
 }
 
 export function levelUp(id) {
@@ -106,7 +108,9 @@ export function levelUp(id) {
   const character = getCharacter(id);
   if (!character || character.level >= 20) return null;
   db.prepare('UPDATE characters SET level = level + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
-  return getCharacter(id);
+  const updated = getCharacter(id);
+  tryAutoLog(character.campaign_id, 'milestone', `${character.name} reached Level ${updated.level}!`, `${character.class} leveled up from ${character.level} to ${updated.level}.`, null);
+  return updated;
 }
 
 export function damageCharacter(id, amount) {
@@ -130,7 +134,9 @@ export function damageCharacter(id, amount) {
 
   newHp = Math.max(0, newHp - remaining);
   db.prepare('UPDATE characters SET hp_current = ?, hp_temp = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newHp, newTemp, id);
-  return getCharacter(id);
+  const updated = getCharacter(id);
+  tryAutoLog(character.campaign_id, 'character_update', `${character.name} took ${amount} damage`, `HP: ${updated.hp_current}/${updated.hpMax}`, null);
+  return updated;
 }
 
 export function healCharacter(id, amount) {
@@ -139,7 +145,16 @@ export function healCharacter(id, amount) {
   if (!character) return null;
   const newHp = Math.min(character.hpMax, character.hpCurrent + amount);
   db.prepare('UPDATE characters SET hp_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newHp, id);
-  return getCharacter(id);
+  const updated = getCharacter(id);
+  tryAutoLog(character.campaign_id, 'character_update', `${character.name} healed for ${amount}`, `HP: ${updated.hp_current}/${updated.hpMax}`, null);
+  return updated;
+}
+
+function tryAutoLog(campaignId, type, title, content, authorId) {
+  if (!campaignId) return;
+  import('./sessionLog.js').then(({ logToActiveSession }) => {
+    logToActiveSession(campaignId, type, title, content, authorId);
+  }).catch(() => {});
 }
 
 function parseCharacterFields(character) {

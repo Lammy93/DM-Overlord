@@ -110,12 +110,16 @@ export function startEncounter(id) {
     .sort((a, b) => (b.initiative || 0) - (a.initiative || 0));
 
   const order = sorted.map(c => c.id);
-  return updateEncounter(id, {
+  const result = updateEncounter(id, {
     status: 'active',
     initiativeOrder: order,
     currentTurn: 0,
     round: 1,
   });
+
+  const names = result.combatants?.map(c => `${c.name} (${c.hp_current} HP)`).join(', ') || 'Unknown';
+  tryAutoLog(encounter.campaign_id, 'combat', `Combat started: ${encounter.name}`, `Combatants: ${names}`, null);
+  return result;
 }
 
 export function nextTurn(id) {
@@ -181,7 +185,20 @@ export function removeCondition(combatantId, condition) {
 }
 
 export function endEncounter(id, status = 'completed') {
-  return updateEncounter(id, { status, currentTurn: 0, round: 0 });
+  const encounter = getEncounter(id);
+  const result = updateEncounter(id, { status, currentTurn: 0, round: 0 });
+  if (encounter) {
+    const alive = encounter.combatants.filter(c => c.hp_current > 0).length;
+    tryAutoLog(encounter.campaign_id, 'combat', `Combat ended: ${encounter.name}`, `${alive}/${encounter.combatants.length} combatants survived. Status: ${status}`, null);
+  }
+  return result;
+}
+
+function tryAutoLog(campaignId, type, title, content, authorId) {
+  if (!campaignId) return;
+  import('./sessionLog.js').then(({ logToActiveSession }) => {
+    logToActiveSession(campaignId, type, title, content, authorId);
+  }).catch(() => {});
 }
 
 function parseField(field, fallback) {

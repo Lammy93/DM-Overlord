@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a0a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd700"/>
+      <stop offset="100%" style="stop-color:#ff8c00"/>
+    </linearGradient>
+    <linearGradient id="fire" x1="0%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff4500"/>
+      <stop offset="100%" style="stop-color:#ffd700"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="url(#bg)" stroke="#ffd700" stroke-width="8"/>
+
+  <!-- Crown -->
+  <path d="M140 180 L160 130 L200 160 L256 110 L312 160 L352 130 L372 180 L372 240 L140 240 Z"
+        fill="url(#gold)" stroke="#b8860b" stroke-width="3"/>
+
+  <!-- Crown jewels -->
+  <circle cx="256" cy="165" r="8" fill="#ff0040"/>
+  <circle cx="200" cy="180" r="6" fill="#00bfff"/>
+  <circle cx="312" cy="180" r="6" fill="#00bfff"/>
+  <circle cx="160" cy="185" r="5" fill="#00ff88"/>
+  <circle cx="352" cy="185" r="5" fill="#00ff88"/>
+
+  <!-- Crown band -->
+  <rect x="140" y="225" width="232" height="15" rx="4" fill="url(#gold)" stroke="#b8860b" stroke-width="2"/>
+
+  <!-- D20 Die body -->
+  <polygon points="256,250 190,310 210,395 302,395 322,310"
+           fill="#2d1b69" stroke="#8b5cf6" stroke-width="3"/>
+
+  <!-- D20 inner triangle -->
+  <polygon points="256,270 210,320 225,380 287,380 302,320"
+           fill="none" stroke="#ffd700" stroke-width="2" opacity="0.6"/>
+
+  <!-- D20 number 20 -->
+  <text x="256" y="345" font-family="Arial Black, sans-serif" font-size="28"
+        font-weight="bold" fill="url(#fire)" text-anchor="middle" dominant-baseline="middle">20</text>
+
+  <!-- Dragon wings -->
+  <path d="M100 280 Q60 200 90 150 Q110 180 130 240 Q140 260 120 290 Z"
+        fill="#8b0000" stroke="#ff4500" stroke-width="2" opacity="0.8"/>
+  <path d="M412 280 Q452 200 422 150 Q402 180 382 240 Q372 260 392 290 Z"
+        fill="#8b0000" stroke="#ff4500" stroke-width="2" opacity="0.8"/>
+
+  <!-- Fire breath left -->
+  <path d="M190 310 Q150 340 130 380 Q160 370 175 350 Q185 335 190 320 Z"
+        fill="url(#fire)" opacity="0.6"/>
+
+  <!-- Fire breath right -->
+  <path d="M322 310 Q362 340 382 380 Q352 370 337 350 Q327 335 322 320 Z"
+        fill="url(#fire)" opacity="0.6"/>
+
+  <!-- Small stars -->
+  <circle cx="120" cy="120" r="3" fill="#fff" opacity="0.7"/>
+  <circle cx="400" cy="100" r="2" fill="#fff" opacity="0.5"/>
+  <circle cx="80" cy="350" r="2" fill="#fff" opacity="0.4"/>
+  <circle cx="440" cy="380" r="3" fill="#fff" opacity="0.6"/>
+  <circle cx="180" cy="90" r="2" fill="#fff" opacity="0.5"/>
+  <circle cx="340" cy="80" r="2" fill="#fff" opacity="0.4"/>
+
+  <!-- Orbiting dots -->
+  <circle cx="256" cy="45" r="3" fill="#ffd700" opacity="0.8"/>
+  <circle cx="470" cy="256" r="3" fill="#ffd700" opacity="0.8"/>
+  <circle cx="256" cy="470" r="3" fill="#ffd700" opacity="0.8"/>
+  <circle cx="42" cy="256" r="3" fill="#ffd700" opacity="0.8"/>
+</svg>
