@@ -143,7 +143,7 @@ export default {
         return interaction.reply({ embeds: [errorEmbed('Permission Denied', 'You can only delete your own characters.')], ephemeral: true });
       }
       deleteCharacter(id);
-      return interaction.reply({ embeds: [successEmbed('Character Deleted', `**${character.name}** has been retired.`)]);
+      return interaction.reply({ embeds: [successEmbed('Character Deleted', `**${character.name}** has been retired.`)] });
     }
 
     if (sub === 'damage') {

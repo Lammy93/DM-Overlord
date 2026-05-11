@@ -1,19 +1,27 @@
-version: '3.8'
-
 services:
   dm-overlord:
-    build: .
+    # Pull from GHCR (pre-built image)
+    image: ghcr.io/lammy93/dm-overlord:latest
+    # To build locally instead: comment the line above, uncomment below
+    # build: .
+
     container_name: dm-overlord
     restart: unless-stopped
+
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - CLIENT_ID=${CLIENT_ID}
       - GUILD_ID=${GUILD_ID}
+      - NARRATION_STYLE=${NARRATION_STYLE:-descriptive}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Obsidian vault path inside container (don't change)
       - OBSIDIAN_VAULT_PATH=/vault
       - OBSIDIAN_SUBFOLDER=DM-Overlord
-      - NARRATION_STYLE=${NARRATION_STYLE:-descriptive}
+      # Database path inside container (don't change)
       - DATABASE_PATH=/app/data/dm-overlord.db
-      - LOG_LEVEL=${LOG_LEVEL:-info}
+
     volumes:
+      # Persist database between restarts
       - ./data:/app/data
-      - ${OBSIDIAN_VAULT_PATH}:/vault:ro
+      # Optional: mount your Obsidian vault (remove if not using)
+      # - /path/to/your/obsidian-vault:/vault:ro

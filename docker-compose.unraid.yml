@@ -1,0 +1,22 @@
+services:
+  dm-overlord:
+    image: ghcr.io/lammy93/dm-overlord:latest
+
+    container_name: DM-Overlord
+    restart: unless-stopped
+    network_mode: bridge
+
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - GUILD_ID=${GUILD_ID}
+      - NARRATION_STYLE=${NARRATION_STYLE:-descriptive}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - OBSIDIAN_VAULT_PATH=/vault
+      - OBSIDIAN_SUBFOLDER=DM-Overlord
+      - DATABASE_PATH=/app/data/dm-overlord.db
+
+    volumes:
+      - /mnt/user/appdata/dm-overlord:/app/data
+      # Uncomment and set this to sync with Obsidian:
+      # - /mnt/user/obsidian-vault:/vault:ro

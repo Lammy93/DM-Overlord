@@ -168,7 +168,7 @@ export default {
         return interaction.reply({ embeds: [errorEmbed('Permission Denied', 'Only the DM can delete this campaign.')], ephemeral: true });
       }
       deleteCampaign(id);
-      return interaction.reply({ embeds: [successEmbed('Campaign Deleted', `**${campaign.name}** has been deleted.`)]);
+      return interaction.reply({ embeds: [successEmbed('Campaign Deleted', `**${campaign.name}** has been deleted.`)] });
     }
 
     if (sub === 'add-player') {
