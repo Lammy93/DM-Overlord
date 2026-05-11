@@ -5,8 +5,9 @@ import { fileURLToPath } from 'url';
 import { extractTextFromPdf, chunkText, extractTableOfContents } from '../services/pdfParser.js';
 import { parseCampaignText, refineWithAI } from '../services/aiParser.js';
 import { saveSourceDocument, getDocument, listDocuments, searchDocuments, deleteDocument, convertDocumentToModule } from '../services/sourceDocs.js';
-import { successEmbed, errorEmbed, infoEmbed } from '../utils/embeds.js';
+import { successEmbed, errorEmbed, infoEmbed, warningEmbed } from '../utils/embeds.js';
 import { getCampaign } from '../services/campaign.js';
+import config from '../config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -85,11 +86,16 @@ export default {
         parsed.title = pdfData.title;
 
         const toc = extractTableOfContents(pdfData.text);
-        const progressEmbed = infoEmbed('Parsing with AI...',
-          `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
-          `Sending to AI for structural analysis...\n` +
-          (toc.length > 0 ? `Detected ${toc.length} chapters in table of contents.` : '')
-        );
+        const hasAI = !!config.ai.openaiKey;
+        const progressEmbed = hasAI
+          ? infoEmbed('Parsing with AI...',
+              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
+              `Sending to AI for structural analysis...\n` +
+              (toc.length > 0 ? `Detected ${toc.length} chapters in table of contents.` : ''))
+          : warningEmbed('AI Not Configured',
+              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
+              `No OPENAI_API_KEY set — storing raw text without AI parsing.\n` +
+              `Set it in .env to enable automatic NPC/location/monster extraction.`);
         await interaction.editReply({ embeds: [progressEmbed] });
 
         const aiResult = await parseCampaignText(pdfData.text, parsed.title);
@@ -128,7 +134,7 @@ export default {
           { name: 'Locations', value: `${parsed.locations.length}`, inline: true },
           { name: 'Monsters', value: `${parsed.monsters.length}`, inline: true },
           { name: 'Items', value: `${parsed.items.length}`, inline: true },
-          { name: 'Next Step', value: 'Use `/import convert` to turn this into a playable adventure module.', inline: false },
+          { name: 'Next Step', value: hasAI ? 'Use `/import convert` to turn this into a playable adventure module.' : 'Set OPENAI_API_KEY in .env then re-import for AI parsing.', inline: false },
         );
         await interaction.editReply({ embeds: [embed] });
 
@@ -186,11 +192,16 @@ export default {
         parsed.title = pdfData.title || parsed.title;
 
         const toc = extractTableOfContents(pdfData.text);
-        const progressEmbed = infoEmbed('Parsing with AI...',
-          `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
-          `Sending to AI for structural analysis...\n` +
-          (toc.length > 0 ? `Detected ${toc.length} chapters in table of contents.` : '')
-        );
+        const hasAI = !!config.ai.openaiKey;
+        const progressEmbed = hasAI
+          ? infoEmbed('Parsing with AI...',
+              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
+              `Sending to AI for structural analysis...\n` +
+              (toc.length > 0 ? `Detected ${toc.length} chapters in table of contents.` : ''))
+          : warningEmbed('AI Not Configured',
+              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
+              `No OPENAI_API_KEY set — storing raw text without AI parsing.\n` +
+              `Set it in .env to enable automatic NPC/location/monster extraction.`);
         await interaction.editReply({ embeds: [progressEmbed] });
 
         const aiResult = await parseCampaignText(pdfData.text, parsed.title);
@@ -229,7 +240,7 @@ export default {
           { name: 'Locations', value: `${parsed.locations.length}`, inline: true },
           { name: 'Monsters', value: `${parsed.monsters.length}`, inline: true },
           { name: 'Items', value: `${parsed.items.length}`, inline: true },
-          { name: 'Next Step', value: 'Use `/import convert` to turn this into a playable adventure module.', inline: false },
+          { name: 'Next Step', value: hasAI ? 'Use `/import convert` to turn this into a playable adventure module.' : 'Set OPENAI_API_KEY in .env then re-import for AI parsing.', inline: false },
         );
         await interaction.editReply({ embeds: [embed] });
 

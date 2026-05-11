@@ -63,6 +63,18 @@ Return valid JSON with this structure:
 IMPORTANT: Extract as much structured content as possible. If unsure about a field, use empty array or null. Keep scene text concise but evocative.`;
 
 export async function parseCampaignText(text, title = 'Unknown Campaign') {
+  if (!config.ai.openaiKey) {
+    return {
+      title,
+      summary: '',
+      chapters: [{ title: 'Extracted Content', chapter_number: 1, content: text.slice(0, 5000), is_dm_section: false, scenes: [] }],
+      npcs: [],
+      locations: [],
+      monsters: [],
+      items: [],
+    };
+  }
+
   const client = getClient();
   const chunks = text.length > 12000 ? [text.slice(0, 12000)] : [text];
 
