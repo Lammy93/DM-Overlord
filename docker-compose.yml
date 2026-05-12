@@ -1,15 +1,12 @@
 services:
   dm-overlord:
-    # Pull from GHCR
-    image: ghcr.io/lammy93/dm-overlord:latest
-    # To build locally:
-    # build: .
+    # Build locally
+    build: .
+    # To pull from GHCR:
+    # image: ghcr.io/lammy93/dm-overlord:latest
 
     container_name: dm-overlord
     restart: unless-stopped
-
-    # Point to your .env file location (change path if needed)
-    env_file: ${ENV_FILE:-./.env}
 
     ports:
       - "3049:3049"
