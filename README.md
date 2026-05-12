@@ -1,260 +1,160 @@
 # DM-Overlord
 
-A Discord bot that serves as your **AI-powered Dungeon Master assistant** for running D&D 5e (2014 & 2024) campaigns. Import campaign PDFs, auto-parse them into structured adventures, run your party through scenes with choices and combat, track characters and encounters, and sync everything to Obsidian.
+A Discord bot and web dashboard for **AI-powered Dungeon Mastering** — import campaign PDFs, run adventures with your party, track characters and combat, sync to Obsidian, and manage everything from a D&D-themed web UI.
 
 ## Features
 
-### 📚 PDF Campaign Import
-- Upload any D&D campaign book PDF
-- AI extracts chapters, scenes, NPCs, locations, monsters, and items
-- Converts into a structured, playable adventure module
-- Supports any campaign book — WoTC or homebrew
+### Web Dashboard
+- **Full SPA** with D&D parchment theme, DragonHunter font, and SVG icon set
+- **Player & Admin login** with username/password authentication (PBKDF2+SHA-512 hashed)
+- **Default admin account**: `Overlord` / `DM` (seeded on first run)
+- **Guild selector** — filter data by Discord server
+- **Collapsible sidebar** sections with persistent state
 
-### 🎮 Adventure Engine
-- Run your party through the adventure scene-by-scene
-- DM narrates, players choose from numbered options
-- Supports skill checks, combat encounters, and branching paths
-- Tracks party state, variables, and history
-- Branching choices with success/fail conditions
-
-### 🎲 Dice Rolling
-- Standard notation (`1d20`, `2d6+3`)
-- Advantage/disadvantage on d20 rolls
-- Hidden rolls (DM-only)
-- DM flavor narration on crits and fails
-
-### 📜 Campaign Management
-- Create and manage multiple campaigns
-- Player invites with roles (player, co-dm, observer)
-- Session logging with summaries, highlights, and loot
-- Campaign notes with categories
-
-### 🧙 Character Sheets
-- Create characters with race, class, stats, and more
-- Track HP, AC, XP, inventory, and currency
-- Damage/heal tracking
-- Level up with XP tracking
-
-### ⚔️ Encounter Builder & Combat Tracker
-- Build encounters from built-in SRD monster database
-- Custom combatants (homebrew monsters, NPCs, allies)
-- Full combat tracker with turn order
-- HP tracking, conditions, auto-initiative
-- DM narration flavor text for hits, crits, kills
-
-### 📖 SRD Content Database
-- **Monsters**: 20+ SRD monsters with full stats, actions, and traits
-- **Spells**: 25+ SRD spells with descriptions, components, and class lists
-- **Items**: Armor, weapons, magic items, potions
-- **Classes & Races**: Full SRD class and race data with subraces
-
-### 📝 Obsidian Vault Integration
-- Sync campaigns, characters, sessions, and encounters directly to your Obsidian vault
-- Auto-generated Markdown notes with proper formatting
-- Organized folder structure: `Campaigns/`, `Characters/`, `Sessions/`, `Encounters/`
-- Obsidian plugin available for advanced integration
-
-## Commands
-
-### Import & Adventures
-| Command | Description |
-|---------|-------------|
-| `/import pdf <file>` | Upload a campaign PDF, AI parses it into structured data |
-| `/import list` | List imported source documents |
-| `/import view <id>` | View parsed document details (chapters, NPCs, etc.) |
-| `/import convert <doc-id> <campaign-id>` | Convert parsed document into a playable adventure module |
-| `/adventure list <campaign-id>` | List available adventure modules |
-| `/adventure start <module-id> <campaign-id>` | Begin running an adventure for your party |
-| `/adventure scene <session-id>` | View current scene narration and choices |
-| `/adventure choose <session-id> <number>` | Make a numbered choice and advance the story |
-| `/adventure status <session-id>` | View session state, history, and variables |
-| `/adventure info <module-id>` | View module details (scenes, NPCs, monsters) |
-| `/adventure end <session-id>` | Conclude an adventure session |
-
-### Dice & Gameplay
-| Command | Description |
-|---------|-------------|
-| `/roll <formula>` | Roll dice (optional: advantage, disadvantage, reason, hidden) |
-| `/srd monster <name>` | Look up a monster from SRD |
-| `/srd spell <name>` | Look up a spell |
-| `/srd item <name>` | Look up an item |
-| `/srd monsters-by-cr <cr>` | List monsters by challenge rating |
+### Dice Roller
+- 3D animated dice with SVG icons (d4, d6, d8, d10, d12, d20, d100)
+- Die selector with +/- counters, modifier input, quick-roll presets
+- Auto-clear timer and clear button
+- Roll results logged to activity feed
 
 ### Campaign Management
-| Command | Description |
-|---------|-------------|
-| `/campaign create` | Create a new campaign |
-| `/campaign list` | List your campaigns |
-| `/campaign info <id>` | View campaign details |
-| `/campaign update <id>` | Update campaign settings |
-| `/campaign add-player` | Invite a player to your campaign |
-| `/campaign remove-player` | Remove a player |
-| `/campaign session` | Log a new session |
-| `/campaign sessions` | View session logs |
-| `/campaign note` | Add a campaign note |
+- Create and manage multiple campaigns across servers
+- **Campaign Library** view — see all campaigns across all guilds
+- Inline campaign rename
+- Player invites with roles (player, co-dm, observer)
+- Session logging with auto-capture
 
-### Character Management
-| Command | Description |
-|---------|-------------|
-| `/character create` | Create a new character |
-| `/character list` | List your characters |
-| `/character view <id>` | View a character sheet |
-| `/character update <id>` | Update HP, AC, stats, etc. |
-| `/character damage <id> <amount>` | Apply damage |
-| `/character heal <id> <amount>` | Restore HP |
-| `/character xp <id> <amount>` | Add experience points |
-| `/character levelup <id>` | Level up |
+### Character System
+- Full D&D 5e character sheet (ability scores, combat stats, skills, proficiencies, features, inventory, spells, personality, backstory)
+- **Roll20 JSON import** — import characters from standard D&D 5e JSON format
+- Character portraits with image support
+- **Missing Soul** status for unlinked characters
+- Auto-calculated HP and AC in character wizard
 
-### Combat Encounters
-| Command | Description |
-|---------|-------------|
-| `/encounter create` | Create a combat encounter |
-| `/encounter list <campaign-id>` | List encounters |
-| `/encounter view <id>` | View encounter status |
-| `/encounter add-monster` | Add SRD monsters to an encounter |
-| `/encounter add-custom` | Add a custom combatant |
-| `/encounter start <id>` | Begin combat with initiative |
-| `/encounter next <id>` | Advance to next turn |
-| `/encounter damage <combatant-id> <amount>` | Damage a combatant |
-| `/encounter condition <combatant-id> <condition>` | Add a condition |
-| `/encounter end <id>` | End the encounter |
+### Adventure Engine
+- Run adventures scene-by-scene with branching choices, skill checks, and combat
+- **Adventure Lobby** — players join with character selection, DM starts when ready
+- **Soul-binding embed** sent to player when character is linked
+- NPC viewer and scene detail modals
+- Variable tracking and choice conditions
 
-### Obsidian Integration
+### Combat Tracker
+- Build encounters from SRD monster database (500 monsters)
+- Full turn-based combat with initiative tracking
+- HP tracking, conditions, damage/heal controls
+- Custom combatant support
+
+### SRD Content Database
+- **500 monsters** with full stats, abilities, and source references
+- **500 spells** with casting info, descriptions, and damage types
+- **500 items** with rarity, type, and attunement info
+- Data sourced from 193 official D&D sources (PHB, DMG, MM, Xanathar's, Tasha's, etc.)
+
+### Map System
+- Upload and view campaign maps
+- Canvas-based viewer with pan, zoom, and grid overlay
+- **Fog of War** with reveal/hide modes
+- Map pins with labels
+- **Map Drop Folder** — drop image files directly into `data/uploads/map-drop/`
+
+### Obsidian Vault Integration
+- Auto-sync characters, campaigns, sessions, encounters, and locations
+- Writes to `Vault/DM-Overlord/{Campaigns,Characters,Sessions,Encounters,Locations}/`
+- Automatic sync on all data changes (Discord commands and web UI)
+- `Missing Soul` label for unlinked characters
+
+### Activity Feed
+- Real-time SSE live log stream in the web UI
+- Filterable event log with timestamp
+- All rolls, commands, and changes logged
+
+### File Browser
+- Browse all uploaded files in `data/uploads/`
+- Upload files directly from the web UI
+- View images and copy shareable URLs
+
+### Player & Admin Management
+- Create player accounts with `/player create`
+- **Automatic DM delivery** of credentials to Discord users
+- Password change on first login (enforced via `must_change_password` flag)
+- Guild-scoped admins with `/admin add/remove/list`
+- Player Roles page to manage campaign permissions
+
+### Guild-Scoped Data
+- All campaigns isolated by Discord server
+- Guild selector in the web UI to switch between servers
+- Data from different servers never mixes
+
+### Auto Membership Check
+- On startup, checks if linked players are still members of their guilds
+- Unlinks characters whose players have left
+- Falls back to individual REST checks if bulk fetch times out
+
+## Web UI Pages
+
+| Page | Access | Description |
+|------|--------|-------------|
+| Dashboard | DM | Stats overview, recent campaigns |
+| Campaigns | DM | Campaign list with library toggle, guild filter |
+| Campaign Detail | DM | Stats, description, characters, players, sessions |
+| Characters | DM | Character grid with portraits, HP, AC, search |
+| Character Detail | DM/Player | Full D&D sheet with all stats |
+| Character Manager | DM | Admin table with search, link/unlink, JSON import |
+| Dice Roller | DM/Player | 3D SVG dice with counters, modifier, presets |
+| Adventures | DM | Campaign picker, module explorer, scene modals |
+| Adventure Session | DM | Lobby view or scene view with choices |
+| Encounters | DM | Campaign picker, encounter list |
+| Encounter Detail | DM | Combat tracker with turn order, HP bars |
+| Maps | DM/Player | Campaign maps with viewer |
+| SRD Browser | DM | Monsters/spells/items tables with detail pages |
+| Activity | DM | Live SSE event log |
+| Player Roles | DM | Per-campaign role management |
+| Settings | DM | Guild settings, embed channel config |
+| File Browser | DM | Upload, browse, view, copy URLs |
+| My Characters | Player | Character cards for linked characters |
+| My Settings | Player | Password change |
+
+## Discord Commands
+
 | Command | Description |
 |---------|-------------|
-| `/obsidian status` | Check Obsidian vault connection |
-| `/obsidian sync-campaign <id>` | Sync campaign notes to vault |
-| `/obsidian sync-character <id>` | Sync character sheet to vault |
-| `/obsidian sync-session <id>` | Sync session log to vault |
-| `/obsidian sync-encounter <id>` | Sync encounter record to vault |
+| `/admin add <user> [role]` | Designate a guild-scoped admin (sends DM with credentials) |
+| `/admin remove <user>` | Remove guild admin |
+| `/admin list` | List guild admins |
+| `/admin link <character-id> [user]` | Link character to Discord user (sends soul-binding embed) |
+| `/admin unlink <character-id>` | Unlink character |
+| `/admin whois [user]` | Show characters linked to a user |
+| `/player create <username> <password> [discord-user]` | Create player account (DMs credentials) |
+| `/player list` | List web UI player accounts |
+| `/player remove <id>` | Deactivate a player account |
+| `/player reset-password <id> <new-password>` | Reset a player's password |
+| `/settings embed-channel #channel` | Set notification channel for embeds |
+| `/settings view` | View server settings |
+| `/dm add <user>` | Designate a global DM |
+| `/dm remove <user>` | Remove global DM |
+| `/roll <formula>` | Roll dice |
+| `/import pdf` | Import campaign PDF |
+| `/adventure start <module-id> <campaign-id>` | Create adventure lobby with join buttons |
+| `/adventure choose <session-id> <choice>` | Make a choice |
+| `/campaign create` | Create a campaign |
+| `/campaign list` | List all campaigns (cross-guild) |
+| `/character create` | Interactive character creation wizard |
+| `/encounter create` | Build a combat encounter |
+| `/obsidian sync-character <id>` | Sync character to Obsidian vault |
 
 ## Quick Start (Docker)
 
-### Prerequisites
-- Docker (Docker Desktop on Windows/Mac, or Unraid's built-in Docker)
-- A Discord Application from https://discord.com/developers/applications
-- An OpenAI API key from https://platform.openai.com/api-keys (for PDF parsing)
-
-### Discord Bot Setup
-1. Go to https://discord.com/developers/applications
-2. Click **New Application** → name it
-3. Go to **Bot** tab → **Create Bot** → copy **Token** and **Client ID**
-4. Enable **Message Content Intent** under Privileged Gateway Intents
-5. Go to **OAuth2** → **URL Generator** → select `bot` + `applications.commands` → open URL to add bot to server
-
-### Run with Docker Compose
-
 ```bash
 git clone https://github.com/Lammy93/DM-Overlord.git
 cd DM-Overlord
-
 cp .env.example .env
-# Edit .env: set DISCORD_TOKEN, CLIENT_ID, GUILD_ID, OPENAI_API_KEY
-
+# Edit .env: set DISCORD_TOKEN, CLIENT_ID
 docker compose up -d
-
-# Register slash commands (run once)
+# Register slash commands for ALL guilds (runs automatically on join)
 docker exec dm-overlord node src/commands/deploy.js
 ```
 
-### Run with Docker CLI
-
-```bash
-docker run -d --name dm-overlord --restart unless-stopped \
-  -e DISCORD_TOKEN=your_token \
-  -e CLIENT_ID=your_client_id \
-  -e GUILD_ID=your_server_id \
-  -e OPENAI_API_KEY=sk-your_key \
-  -v $(pwd)/data:/app/data \
-  ghcr.io/lammy93/dm-overlord:latest
-```
-
-### Run Locally (Node.js)
-
-```bash
-git clone https://github.com/Lammy93/DM-Overlord.git
-cd DM-Overlord
-
-cp .env.example .env
-# Edit .env
-
-npm install
-npm run deploy
-npm start
-```
-
-## Unraid Setup
-
-### Via Docker Compose (recommended)
-1. Install **Compose Manager** from Unraid's Community Apps
-2. Create a new stack, paste `docker-compose.unraid.yml` from the repo
-3. Set environment variables (DISCORD_TOKEN, CLIENT_ID, GUILD_ID, OPENAI_API_KEY)
-4. Click **Compose Up** — pulls `ghcr.io/lammy93/dm-overlord:latest`
-
-### Via Docker UI
-1. **Docker** tab → **Add Container**
-2. Repository: `ghcr.io/lammy93/dm-overlord:latest`
-3. Add variables: `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, `OPENAI_API_KEY`
-
-## Importing a Campaign Book
-
-### Step 1: Upload the PDF
-```
-/import pdf
-```
-Attach your campaign PDF. The bot extracts text and sends it to OpenAI for structural analysis (chapters, scenes, NPCs, locations, monsters, items).
-
-### Step 2: Review the parsed data
-```
-/import view <document-id>
-```
-Check what was extracted — chapters, NPCs, locations, etc.
-
-### Step 3: Convert to adventure module
-```
-/import convert <document-id> <campaign-id>
-```
-Turns the parsed data into a playable adventure with scenes and choices.
-
-### Step 4: Run the adventure
-```
-/adventure start <module-id> <campaign-id>
-```
-The bot narrates the first scene. Players pick choices with `/adventure choose`.
-
-### Example Module Structure
-Adventures are stored as structured JSON with scenes containing narration text, choices with conditions, skill checks, combat encounters, and loot. The AI extracts this automatically from PDFs, or you can write your own:
-
-```json
-{
-  "title": "The Lost Mine",
-  "scenes": [
-    {
-      "id": "cave_entrance",
-      "title": "Cave Entrance",
-      "type": "exploration",
-      "text": "Darkness pours from the cave mouth...",
-      "choices": [
-        { "text": "Enter quietly", "nextScene": "goblin_ambush", "requiredCheck": { "skill": "stealth", "dc": 12 } },
-        { "text": "Light a torch", "nextScene": "cave_lit" }
-      ]
-    }
-  ]
-}
-```
-
-## Obsidian Vault Setup
-
-1. Set `OBSIDIAN_VAULT_PATH` in `.env` to your vault's absolute path
-2. When using Docker, mount the vault:
-   ```yaml
-   volumes:
-     - /path/to/your/obsidian-vault:/vault:ro
-   ```
-3. Use `/obsidian status` to verify connection
-4. Use `/obsidian sync-campaign`, `/obsidian sync-character`, etc. to write notes
-
-The bot auto-creates a `DM-Overlord/` folder with subdirectories: `Campaigns/`, `Characters/`, `Sessions/`, `Encounters/`.
+The bot auto-registers commands for any guild it joins via the `guildCreate` event. On startup, it also syncs commands to all guilds it's already in.
 
 ## Environment Variables
 
@@ -262,73 +162,23 @@ The bot auto-creates a `DM-Overlord/` folder with subdirectories: `Campaigns/`, 
 |----------|----------|---------|-------------|
 | `DISCORD_TOKEN` | Yes | - | Discord bot token |
 | `CLIENT_ID` | Yes | - | Discord application ID |
-| `GUILD_ID` | No | - | Server ID for instant command registration |
-| `OPENAI_API_KEY` | No* | - | OpenAI API key (required for PDF import) |
-| `AI_MODEL` | No | `gpt-4o-mini` | AI model for parsing ($0.01/book) |
-| `OBSIDIAN_VAULT_PATH` | No | - | Absolute path to your Obsidian vault |
-| `OBSIDIAN_SUBFOLDER` | No | `DM-Overlord` | Subfolder in vault for notes |
-| `NARRATION_STYLE` | No | `descriptive` | descriptive, cinematic, minimal, humorous |
-| `LOG_LEVEL` | No | `info` | debug, info, warn, error |
+| `OPENAI_API_KEY` | No* | - | Required for PDF import AI parsing |
+| `WEB_DM_PASSWORD` | No | `overlord` | Web UI admin password (legacy) |
+| `WEB_PORT` | No | `3000` | Web UI port |
+| `WEB_HOST` | No | `localhost` | Web UI bind host (set to `0.0.0.0` for Docker) |
+| `WEB_BASE_URL` | No | `http://localhost:3000` | External URL for Discord map links |
+| `OBSIDIAN_VAULT_PATH` | No | - | Absolute path to Obsidian vault |
+| `DATABASE_PATH` | No | `./data/dm-overlord.db` | SQLite database location |
 
-*Required for `/import pdf` and `/adventure` commands that use AI. Everything else works without it.
+*PDF import requires `OPENAI_API_KEY`. Everything else works without it.
 
-## Updating
+## Default Credentials
 
-### Docker
-```bash
-git pull
-docker compose pull
-docker compose up -d
-```
+On first launch, a default admin account is created:
+- **Username**: `Overlord`
+- **Password**: `DM`
 
-### Local
-```bash
-git pull
-npm install
-node src/commands/deploy.js
-npm start
-```
-
-## Project Structure
-
-```
-DM-Overlord/
-├── src/
-│   ├── index.js               # Entry point
-│   ├── config.js              # Configuration
-│   ├── client.js              # Discord client setup
-│   ├── commands/              # Slash commands
-│   │   ├── roll.js            # Dice rolling
-│   │   ├── import-cmd.js      # PDF import & AI parsing
-│   │   ├── adventure.js       # Adventure engine runner
-│   │   ├── campaign/          # Campaign management
-│   │   ├── character/         # Character sheets
-│   │   ├── encounter/         # Combat encounters
-│   │   ├── obsidian.js        # Obsidian vault sync
-│   │   └── srd-cmd.js         # SRD content lookup
-│   ├── events/                # Discord event handlers
-│   ├── services/              # Business logic
-│   │   ├── dice.js            # Dice engine
-│   │   ├── campaign.js        # Campaign CRUD
-│   │   ├── character.js       # Character CRUD
-│   │   ├── encounter.js       # Combat tracker
-│   │   ├── adventure.js       # Adventure engine
-│   │   ├── aiParser.js        # OpenAI integration
-│   │   ├── pdfParser.js       # PDF text extraction
-│   │   ├── sourceDocs.js      # Source document storage
-│   │   ├── content.js         # Custom content manager
-│   │   ├── obsidian.js        # Vault file writer
-│   │   ├── srd.js             # SRD data queries
-│   │   └── narration.js       # DM flavor text
-│   ├── db/                    # SQLite database layer
-│   ├── data/                  # SRD JSON + templates
-│   └── utils/                 # Embeds, formatters, validators
-├── obsidian-plugin/           # Obsidian vault plugin
-├── docker-compose.yml
-├── docker-compose.unraid.yml
-├── Dockerfile
-└── package.json
-```
+You can change this password after logging in. Create additional admin accounts with `/admin add` in Discord — credentials are sent via DM.
 
 ## License
 
