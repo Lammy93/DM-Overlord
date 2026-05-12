@@ -40,7 +40,7 @@ export function validateHp(hp) {
 }
 
 export function validateCharacterName(name) {
-  return typeof name === 'string' && name.length >= 2 && name.length <= 50;
+  return typeof name === 'string' && name.trim().length >= 2 && name.length <= 50;
 }
 
 export const VALID_RACES = [

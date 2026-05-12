@@ -8,6 +8,7 @@ RUN npm install --omit=dev
 COPY . .
 RUN mkdir -p /app/data
 
+EXPOSE 3000
 VOLUME ["/app/data"]
 
 CMD ["node", "src/index.js"]

@@ -1,6 +1,9 @@
 import { getDb } from '../db/index.js';
 
 export function createCharacter(data) {
+  if (!data.playerDiscordId || data.playerDiscordId === '') {
+    throw new Error('playerDiscordId is required to create a character');
+  }
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO characters (
@@ -8,13 +11,13 @@ export function createCharacter(data) {
       alignment, experience, stats, skills, hp_current, hp_max, hp_temp,
       armor_class, initiative_bonus, speed, proficiencies, features,
       spells, inventory, copper, silver, electrum, gold, platinum,
-      personality_traits, ideals, bonds, flaws, backstory, appearance
+      personality_traits, ideals, bonds, flaws, backstory, appearance, image_url
     ) VALUES (
       @campaignId, @playerDiscordId, @name, @race, @class, @subclass, @level,
       @background, @alignment, @experience, @stats, @skills, @hpCurrent, @hpMax,
       @hpTemp, @armorClass, @initiativeBonus, @speed, @proficiencies, @features,
       @spells, @inventory, @copper, @silver, @electrum, @gold, @platinum,
-      @personalityTraits, @ideals, @bonds, @flaws, @backstory, @appearance
+      @personalityTraits, @ideals, @bonds, @flaws, @backstory, @appearance, @imageUrl
     )
   `);
   const result = stmt.run({
@@ -51,6 +54,7 @@ export function createCharacter(data) {
     flaws: data.flaws || null,
     backstory: data.backstory || null,
     appearance: data.appearance || null,
+    imageUrl: data.imageUrl || null,
   });
   return getCharacter(result.lastInsertRowid);
 }
@@ -95,25 +99,30 @@ export function deleteCharacter(id) {
   db.prepare('UPDATE characters SET is_active = 0 WHERE id = ?').run(id);
 }
 
-export function addExperience(id, amount) {
-  const db = getDb();
-  db.prepare('UPDATE characters SET experience = experience + ? WHERE id = ?').run(amount, id);
-  const character = getCharacter(id);
-  tryAutoLog(character?.campaign_id, 'character_update', `${character?.name || 'Character'} gained ${amount} XP`, `Total XP: ${character?.experience || 0}`, null);
-  return character;
-}
-
-export function levelUp(id) {
+export function addExperience(id, amount, username = null) {
   const db = getDb();
   const character = getCharacter(id);
-  if (!character || character.level >= 20) return null;
-  db.prepare('UPDATE characters SET level = level + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  if (!character) return null;
+  const newXp = character.experience + amount;
+  db.prepare('UPDATE characters SET experience = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newXp, id);
   const updated = getCharacter(id);
-  tryAutoLog(character.campaign_id, 'milestone', `${character.name} reached Level ${updated.level}!`, `${character.class} leveled up from ${character.level} to ${updated.level}.`, null);
+  tryAutoLog(character.campaign_id, 'character_update', `${character.name} gained ${amount} XP`, `Total XP: ${updated.experience}`, null, username);
   return updated;
 }
 
-export function damageCharacter(id, amount) {
+export function levelUp(id, username = null) {
+  const db = getDb();
+  const character = getCharacter(id);
+  if (!character) return null;
+  if (character.level >= 20) return null;
+  const newLevel = character.level + 1;
+  db.prepare('UPDATE characters SET level = ?, hp_max = ?, hp_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newLevel, (character.hpMax || 10) + 6, (character.hpCurrent || 10) + 6, id);
+  const updated = getCharacter(id);
+  tryAutoLog(character.campaign_id, 'milestone', `${character.name} reached level ${newLevel}!`, `Level ${newLevel} ${character.class}`, null, username);
+  return updated;
+}
+
+export function damageCharacter(id, amount, username = null) {
   const db = getDb();
   const character = getCharacter(id);
   if (!character) return null;
@@ -135,26 +144,30 @@ export function damageCharacter(id, amount) {
   newHp = Math.max(0, newHp - remaining);
   db.prepare('UPDATE characters SET hp_current = ?, hp_temp = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newHp, newTemp, id);
   const updated = getCharacter(id);
-  tryAutoLog(character.campaign_id, 'character_update', `${character.name} took ${amount} damage`, `HP: ${updated.hp_current}/${updated.hpMax}`, null);
+  tryAutoLog(character.campaign_id, 'character_update', `${character.name} took ${amount} damage`, `HP: ${updated.hp_current}/${updated.hpMax}`, null, username);
   return updated;
 }
 
-export function healCharacter(id, amount) {
+export function healCharacter(id, amount, username = null) {
   const db = getDb();
   const character = getCharacter(id);
   if (!character) return null;
   const newHp = Math.min(character.hpMax, character.hpCurrent + amount);
   db.prepare('UPDATE characters SET hp_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newHp, id);
   const updated = getCharacter(id);
-  tryAutoLog(character.campaign_id, 'character_update', `${character.name} healed for ${amount}`, `HP: ${updated.hp_current}/${updated.hpMax}`, null);
+  tryAutoLog(character.campaign_id, 'character_update', `${character.name} healed for ${amount}`, `HP: ${updated.hp_current}/${updated.hpMax}`, null, username);
   return updated;
 }
 
-function tryAutoLog(campaignId, type, title, content, authorId) {
+function tryAutoLog(campaignId, type, title, content, authorId, authorUsername = null) {
   if (!campaignId) return;
   import('./sessionLog.js').then(({ logToActiveSession }) => {
-    logToActiveSession(campaignId, type, title, content, authorId);
+    logToActiveSession(campaignId, type, title, content, authorId, authorUsername);
   }).catch(() => {});
+}
+
+export function tryAutoLogCharacter(campaignId, type, title, content, authorId, authorUsername = null) {
+  tryAutoLog(campaignId, type, title, content, authorId, authorUsername);
 }
 
 function parseCharacterFields(character) {

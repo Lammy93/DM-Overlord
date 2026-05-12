@@ -22,11 +22,20 @@ export default {
     path: process.env.DATABASE_PATH || join(__dirname, '..', 'data', 'dm-overlord.db'),
   },
   ai: {
+    provider: process.env.AI_PROVIDER || 'openai',
     openaiKey: process.env.OPENAI_API_KEY || '',
+    openaiBaseUrl: process.env.OPENAI_BASE_URL || '',
+    claudeKey: process.env.CLAUDE_API_KEY || '',
+    claudeBaseUrl: process.env.CLAUDE_BASE_URL || '',
     model: process.env.AI_MODEL || 'gpt-4o-mini',
   },
   narration: {
     style: process.env.NARRATION_STYLE || 'descriptive',
+  },
+  web: {
+    port: parseInt(process.env.WEB_PORT || '3000', 10),
+    host: process.env.WEB_HOST || 'localhost',
+    baseUrl: process.env.WEB_BASE_URL || '',
   },
   paths: {
     data: join(__dirname, 'data'),

@@ -1,6 +1,7 @@
 import { getDb } from '../db/index.js';
 import { createSessionLog, getSessionLog, getCampaign } from './campaign.js';
 import { writeSessionNote } from './obsidian.js';
+import eventBus from './eventBus.js';
 
 export function startAutoSession(campaignId, sessionNumber, dmDiscordId, channelId = null, title = null) {
   const db = getDb();
@@ -17,6 +18,19 @@ export function startAutoSession(campaignId, sessionNumber, dmDiscordId, channel
   `).run(campaignId, session.id, channelId, dmDiscordId);
 
   logEvent(session.id, 'narrative', 'Session Started', `Session ${sessionNumber}${title ? ': ' + title : ''} has begun.`, dmDiscordId);
+
+  eventBus.emit('log', {
+    type: 'session_start',
+    subtype: 'session',
+    title: `Session ${sessionNumber} Started`,
+    content: `Campaign #${campaignId} — ${title || `Session ${sessionNumber}`}`,
+    sessionLogId: session.id,
+    campaignId,
+    sessionNumber,
+    userId: dmDiscordId,
+    timestamp: new Date().toISOString(),
+  });
+
   return { session, active: db.prepare('SELECT * FROM session_active WHERE campaign_id = ?').get(campaignId), message: null };
 }
 
@@ -27,7 +41,23 @@ export function stopAutoSession(campaignId, dmDiscordId) {
 
   const session = getSessionLog(active.session_log_id);
   logEvent(active.session_log_id, 'narrative', 'Session Ended', `Session ${session.session_number} has concluded.`, dmDiscordId);
+
+  eventBus.emit('log', {
+    type: 'session_end',
+    subtype: 'session',
+    title: `Session ${session.session_number} Ended`,
+    content: `Campaign #${campaignId} — Session ${session.session_number} has concluded.`,
+    sessionLogId: session.id,
+    campaignId,
+    sessionNumber: session.session_number,
+    userId: dmDiscordId,
+    timestamp: new Date().toISOString(),
+  });
+
   db.prepare('DELETE FROM session_active WHERE campaign_id = ?').run(campaignId);
+
+  syncToObsidian(session.id).catch(() => {});
+
   return { session };
 }
 
@@ -47,7 +77,22 @@ export function logEvent(sessionLogId, type, title, content, authorDiscordId = n
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(sessionLogId, type, title, content || null, authorDiscordId, authorUsername, isDmOnly ? 1 : 0);
-  return db.prepare('SELECT * FROM session_auto_logs WHERE id = ?').get(result.lastInsertRowid);
+  const log = db.prepare('SELECT * FROM session_auto_logs WHERE id = ?').get(result.lastInsertRowid);
+
+  eventBus.emit('log', {
+    type: 'session_log',
+    subtype: type,
+    title,
+    content,
+    sessionLogId,
+    logId: log.id,
+    authorId: authorDiscordId,
+    authorUsername,
+    isDmOnly,
+    timestamp: new Date().toISOString(),
+  });
+
+  return log;
 }
 
 export function logToActiveSession(campaignId, type, title, content, authorDiscordId = null, authorUsername = null, isDmOnly = false) {

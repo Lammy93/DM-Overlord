@@ -1,4 +1,5 @@
 import { EmbedBuilder, Colors } from 'discord.js';
+import { parseJsonField } from './formatters.js';
 
 export function baseEmbed(title, color = Colors.Blurple) {
   return new EmbedBuilder()
@@ -39,26 +40,45 @@ export function diceEmbed(results, formula, total) {
 }
 
 export function characterEmbed(character) {
-  const embed = baseEmbed(`${character.name} - Level ${character.level} ${character.race} ${character.class}`, Colors.Green);
-  embed.setThumbnail('https://cdn.discordapp.com/embed/avatars/0.png');
-  const stats = typeof character.stats === 'string' ? JSON.parse(character.stats) : character.stats;
-  const statStr = Object.entries(stats)
-    .map(([k, v]) => `${k.toUpperCase()}: ${v}`)
-    .join(' | ');
+  const embed = baseEmbed(`${character.name} — Level ${character.level} ${character.race || ''} ${character.class || ''}`, Colors.Green);
+  if (character.image_url) {
+    embed.setThumbnail(character.image_url);
+  }
+  const stats = parseJsonField(character.stats, {});
+  const statStr = Object.keys(stats).length > 0 ? Object.entries(stats)
+    .map(([k, v]) => {
+      const mod = Math.floor((v - 10) / 2);
+      const sign = mod >= 0 ? '+' : '';
+      return `${k.toUpperCase()} ${v} (${sign}${mod})`;
+    })
+    .join('\n') : '';
+  if (statStr) {
+    embed.addFields({ name: 'Ability Scores', value: statStr, inline: true });
+  }
   embed.addFields(
-    { name: 'Stats', value: statStr || 'Not set', inline: false },
-    { name: 'HP', value: `${character.hp_current || character.hp_max || '?'}/${character.hp_max || '?'}`, inline: true },
-    { name: 'AC', value: `${character.armor_class || '?'}`, inline: true },
-    { name: 'Speed', value: `${character.speed || 30}ft`, inline: true },
-    { name: 'Proficiencies', value: getArrayField(character.proficiencies, 'None') },
-    { name: 'Inventory', value: getArrayField(character.inventory, 'Empty'), inline: false }
+    { name: '❤️ HP', value: `${character.hp_current ?? character.hp_max ?? '?'}/${character.hp_max ?? '?'}`, inline: true },
+    { name: '🛡️ AC', value: `${character.armor_class || '?'}`, inline: true },
+    { name: '👟 Speed', value: `${character.speed || 30}ft`, inline: true },
   );
+  if (character.alignment) {
+    embed.addFields({ name: 'Alignment', value: character.alignment, inline: true });
+  }
+  if (character.background) {
+    embed.addFields({ name: 'Background', value: character.background, inline: true });
+  }
+  const prof = getArrayField(character.proficiencies, null);
+  if (prof) embed.addFields({ name: 'Proficiencies', value: prof, inline: false });
+  const inv = getArrayField(character.inventory, null);
+  if (inv) embed.addFields({ name: 'Inventory', value: inv, inline: false });
+  const features = getArrayField(character.features, null);
+  if (features) embed.addFields({ name: 'Features', value: features, inline: false });
+  embed.setFooter({ text: `ID: ${character.id} | XP: ${character.experience || 0}` });
   return embed;
 }
 
 function getArrayField(data, fallback) {
   if (!data) return fallback;
-  const arr = typeof data === 'string' ? JSON.parse(data) : data;
+  const arr = parseJsonField(data, null);
   if (!Array.isArray(arr) || arr.length === 0) return fallback;
   return arr.slice(0, 10).join(', ') + (arr.length > 10 ? ` +${arr.length - 10} more` : '');
 }
@@ -72,9 +92,7 @@ export function encounterEmbed(encounter, combatants) {
     { name: 'Difficulty', value: encounter.difficulty || 'Unknown', inline: true }
   );
   if (combatants && combatants.length > 0) {
-    const order = encounter.initiative_order
-      ? (typeof encounter.initiative_order === 'string' ? JSON.parse(encounter.initiative_order) : encounter.initiative_order)
-      : [];
+    const order = encounter.initiative_order ? parseJsonField(encounter.initiative_order, []) : [];
     const sorted = [...combatants].sort((a, b) => (order.indexOf(a.id) !== -1 ? order.indexOf(a.id) : 999) - (order.indexOf(b.id) !== -1 ? order.indexOf(b.id) : 999));
     const list = sorted.map(c => {
       const marker = c.type === 'player' ? '🧑' : c.type === 'ally' ? '🤝' : '👹';
@@ -87,7 +105,7 @@ export function encounterEmbed(encounter, combatants) {
 }
 
 function getHpBar(current, max) {
-  if (!max || max === 0) return '';
+  if (!max || max === 0 || current == null || isNaN(current)) return '';
   const pct = current / max;
   const bars = 10;
   const filled = Math.round(pct * bars);

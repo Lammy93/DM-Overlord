@@ -27,17 +27,24 @@ export function getCampaign(id) {
   return campaign;
 }
 
-export function listCampaigns(discordId, role = 'dm') {
+export function listCampaigns(discordId, role = 'dm', guildId = null) {
   const db = getDb();
   if (role === 'dm') {
-    return db.prepare('SELECT * FROM campaigns WHERE dm_discord_id = ? ORDER BY updated_at DESC').all(discordId);
+    let sql = 'SELECT * FROM campaigns WHERE dm_discord_id = ?';
+    const params = [discordId];
+    if (guildId) { sql += ' AND guild_id = ?'; params.push(guildId); }
+    sql += ' ORDER BY updated_at DESC';
+    return db.prepare(sql).all(...params);
   }
-  const campaigns = db.prepare(`
+  let sql = `
     SELECT c.* FROM campaigns c
     JOIN campaign_players cp ON c.id = cp.campaign_id
-    WHERE cp.discord_id = ? ORDER BY c.updated_at DESC
-  `).all(discordId);
-  return campaigns;
+    WHERE cp.discord_id = ?
+  `;
+  const params = [discordId];
+  if (guildId) { sql += ' AND c.guild_id = ?'; params.push(guildId); }
+  sql += ' ORDER BY c.updated_at DESC';
+  return db.prepare(sql).all(...params);
 }
 
 export function updateCampaign(id, data) {

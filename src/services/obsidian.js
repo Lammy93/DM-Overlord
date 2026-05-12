@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { readFile } from 'fs/promises';
 import config from '../config.js';
+import { getDb } from '../db/index.js';
 
 const TEMPLATES = {
   campaign: `# {{name}}
@@ -143,8 +144,12 @@ async function writeNote(filePath, content) {
 
 export async function writeCampaignNote(campaign) {
   const base = ensureVaultStructure();
+  const safeCampaignName = campaign.name.replace(/[<>:"/\\|?*]/g, '_');
   const players = campaign.players?.map(p => `- ${p.discord_username} (${p.role})`).join('\n') || 'None';
-  const characters = campaign.characters?.map(c => `- ${c.name} (Level ${c.level} ${c.class})`).join('\n') || 'None';
+  const characters = campaign.characters?.map(c => {
+    const safeCharName = c.name.replace(/[<>:"/\\|?*]/g, '_');
+    return `- [[Characters/${safeCharName}|${c.name}]] (Level ${c.level} ${c.class})`;
+  }).join('\n') || 'None';
   const sessions = campaign.currentSession ? `Session ${campaign.currentSession} completed` : 'None yet';
 
   const content = TEMPLATES.campaign
@@ -157,12 +162,37 @@ export async function writeCampaignNote(campaign) {
     .replace('{{locations}}', 'No locations registered')
     .replace('{{date}}', new Date().toLocaleDateString());
 
-  const safeName = campaign.name.replace(/[<>:"/\\|?*]/g, '_');
-  const filePath = join(base, 'Campaigns', `${safeName}.md`);
-  return writeNote(filePath, content);
+  const filePath = join(base, 'Campaigns', `${safeCampaignName}.md`);
+
+  const campaignResult = await writeNote(filePath, content);
+
+  if (campaignResult.success && campaign.characters) {
+    for (const c of campaign.characters) {
+      const fullChar = await getCharacterById(c.id);
+      if (fullChar) {
+        await writeCharacterNote(fullChar, null, safeCampaignName);
+      }
+    }
+  }
+
+  return campaignResult;
 }
 
-export async function writeCharacterNote(character, playerName = 'Unknown') {
+async function getCharacterById(id) {
+  const db = getDb();
+  return db.prepare('SELECT * FROM characters WHERE id = ?').get(id);
+}
+
+export async function writeCharacterNote(character, playerName = null, campaignName = null) {
+  if (!playerName) {
+    if (character.player_discord_id && character.player_discord_id !== '') {
+      const db = getDb();
+      const webUser = db.prepare('SELECT display_name FROM web_users WHERE discord_id = ?').get(character.player_discord_id);
+      playerName = webUser?.display_name || character.player_discord_id;
+    } else {
+      playerName = 'Missing Soul';
+    }
+  }
   const base = ensureVaultStructure();
   const stats = typeof character.stats === 'object' ? character.stats : {};
   const profs = Array.isArray(character.proficiencies) ? character.proficiencies.join(', ') : 'None';
@@ -170,6 +200,28 @@ export async function writeCharacterNote(character, playerName = 'Unknown') {
   const spells = character.spells ? Object.entries(character.spells).map(([k, v]) => `- ${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n') : 'None';
   const inv = Array.isArray(character.inventory) ? character.inventory.map(i => `- ${typeof i === 'string' ? i : i.name || i}`).join('\n') : 'None';
   const currency = `${character.gold || 0} gp, ${character.silver || 0} sp, ${character.copper || 0} cp`;
+
+  let partySection = '';
+  if (character.campaign_id) {
+    const db = getDb();
+    const party = db.prepare('SELECT id, name, race, class, level FROM characters WHERE campaign_id = ? AND id != ?').all(character.campaign_id, character.id);
+    if (party.length > 0) {
+      partySection = '\n\n## Party\n' + party.map(c => {
+        const safeName = c.name.replace(/[<>:"/\\|?*]/g, '_');
+        return `- [[Characters/${safeName}|${c.name}]] — Level ${c.level} ${c.race || ''} ${c.class || ''}`;
+      }).join('\n');
+    }
+    if (campaignName) {
+      const safeCampaignName = campaignName.replace(/[<>:"/\\|?*]/g, '_');
+      partySection += `\n\n**Campaign:** [[Campaigns/${safeCampaignName}|${campaignName}]]`;
+    } else {
+      const campaign = db.prepare('SELECT name FROM campaigns WHERE id = ?').get(character.campaign_id);
+      if (campaign) {
+        const safeCampaignName = campaign.name.replace(/[<>:"/\\|?*]/g, '_');
+        partySection += `\n\n**Campaign:** [[Campaigns/${safeCampaignName}|${campaign.name}]]`;
+      }
+    }
+  }
 
   const content = TEMPLATES.character
     .replace('{{name}}', character.name)
@@ -198,10 +250,24 @@ export async function writeCharacterNote(character, playerName = 'Unknown') {
     .replace('{{bonds}}', character.bonds || 'Unknown')
     .replace('{{flaws}}', character.flaws || 'Unknown')
     .replace('{{backstory}}', character.backstory || 'None yet')
-    .replace('{{playerName}}', playerName);
+    .replace('{{playerName}}', playerName) + partySection;
 
   const safeName = character.name.replace(/[<>:"/\\|?*]/g, '_');
   const filePath = join(base, 'Characters', `${safeName}.md`);
+  return writeNote(filePath, content);
+}
+
+export async function writeLocationNote(location, campaignName = null) {
+  const base = ensureVaultStructure();
+  const safeName = location.name.replace(/[<>:"/\\|?*]/g, '_');
+  let parentSection = '';
+  if (location.parent_location_id) {
+    const db = getDb();
+    const parent = db.prepare('SELECT name FROM campaign_locations WHERE id = ?').get(location.parent_location_id);
+    if (parent) parentSection = `\n**Parent Location:** [[Locations/${parent.name.replace(/[<>:"/\\|?*]/g, '_')}|${parent.name}]]`;
+  }
+  const content = `# ${location.name}\n\n**Type:** ${location.type || 'Unknown'}${parentSection}\n\n## Description\n${location.description || 'No description yet.'}\n\n---\n*Campaign: ${campaignName || 'Unknown'}*`;
+  const filePath = join(base, 'Locations', `${safeName}.md`);
   return writeNote(filePath, content);
 }
 

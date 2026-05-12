@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS characters (
   backstory TEXT,
   appearance TEXT,
   notes TEXT,
+  image_url TEXT,
   is_active INTEGER DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -235,6 +236,36 @@ CREATE TABLE IF NOT EXISTS session_active (
   UNIQUE(campaign_id)
 );
 
+CREATE TABLE IF NOT EXISTS campaign_maps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  width INTEGER DEFAULT 0,
+  height INTEGER DEFAULT 0,
+  grid_size INTEGER DEFAULT 50,
+  grid_offset_x INTEGER DEFAULT 0,
+  grid_offset_y INTEGER DEFAULT 0,
+  is_public INTEGER DEFAULT 1,
+  notes TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS map_pins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  map_id INTEGER NOT NULL REFERENCES campaign_maps(id) ON DELETE CASCADE,
+  label TEXT,
+  description TEXT,
+  x INTEGER NOT NULL,
+  y INTEGER NOT NULL,
+  pin_type TEXT DEFAULT 'location',
+  icon TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_campaign_maps_campaign ON campaign_maps(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_map_pins_map ON map_pins(map_id);
 CREATE INDEX IF NOT EXISTS idx_session_auto_logs_session ON session_auto_logs(session_log_id);
 CREATE INDEX IF NOT EXISTS idx_session_auto_logs_type ON session_auto_logs(type);
 CREATE INDEX IF NOT EXISTS idx_custom_content_campaign ON custom_content(campaign_id);
@@ -243,4 +274,65 @@ CREATE INDEX IF NOT EXISTS idx_adventure_modules_campaign ON adventure_modules(c
 CREATE INDEX IF NOT EXISTS idx_adventure_sessions_module ON adventure_sessions(module_id);
 CREATE INDEX IF NOT EXISTS idx_source_documents_campaign ON source_documents(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_document_chapters_document ON document_chapters(document_id);
+
+-- Migration: add image_url to characters (safe error if column exists)
+ALTER TABLE characters ADD COLUMN image_url TEXT;
+
+-- Migration: add materials to source_documents (safe error if column exists)
+ALTER TABLE source_documents ADD COLUMN materials TEXT DEFAULT '[]';
+
+-- Migration: fog_data to campaign_maps (safe error if column exists)
+ALTER TABLE campaign_maps ADD COLUMN fog_data TEXT DEFAULT '[]';
+ALTER TABLE campaign_maps ADD COLUMN is_dm_only INTEGER DEFAULT 0;
+
+-- Migration: dm_users table (safe error if table exists)
+CREATE TABLE IF NOT EXISTS dm_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  discord_id TEXT NOT NULL UNIQUE,
+  discord_username TEXT,
+  notes TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Migration: guild_admins table (safe error if table exists)
+CREATE TABLE IF NOT EXISTS guild_admins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  discord_id TEXT NOT NULL,
+  discord_username TEXT,
+  role TEXT DEFAULT 'admin' CHECK(role IN ('admin', 'co-dm')),
+  created_by TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(guild_id, discord_id)
+);
+
+-- Migration: guild_settings table (safe error if table exists)
+CREATE TABLE IF NOT EXISTS guild_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(guild_id, key)
+);
+
+-- Migration: add role column to existing web_users (safe error if column exists)
+ALTER TABLE web_users ADD COLUMN role TEXT DEFAULT 'player';
+
+-- Migration: add must_change_password to existing web_users (safe error if column exists)
+ALTER TABLE web_users ADD COLUMN must_change_password INTEGER DEFAULT 0;
+
+-- Migration: web_users table (safe error if table exists)
+CREATE TABLE IF NOT EXISTS web_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  discord_id TEXT,
+  display_name TEXT,
+  role TEXT DEFAULT 'player' CHECK(role IN ('admin', 'player')),
+  created_by TEXT,
+  is_active INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `;

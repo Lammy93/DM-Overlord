@@ -27,6 +27,11 @@ export function getEncounter(id) {
   return encounter;
 }
 
+export function deleteEncounter(id) {
+  const db = getDb();
+  db.prepare('DELETE FROM encounters WHERE id = ?').run(id);
+}
+
 export function listEncounters(campaignId) {
   const db = getDb();
   return db.prepare('SELECT * FROM encounters WHERE campaign_id = ? ORDER BY updated_at DESC').all(campaignId);
@@ -190,14 +195,21 @@ export function endEncounter(id, status = 'completed') {
   if (encounter) {
     const alive = encounter.combatants.filter(c => c.hp_current > 0).length;
     tryAutoLog(encounter.campaign_id, 'combat', `Combat ended: ${encounter.name}`, `${alive}/${encounter.combatants.length} combatants survived. Status: ${status}`, null);
+    tryAutoLog(encounter.campaign_id, 'note', `Encounter: ${encounter.name}`, `Difficulty: ${encounter.difficulty}, Rounds: ${encounter.round || 0}, Status: ${status}`, null);
+    import('./obsidian.js').then(({ writeEncounterNote }) => {
+      import('./campaign.js').then(({ getCampaign }) => {
+        const campaign = getCampaign(encounter.campaign_id);
+        writeEncounterNote(encounter, campaign?.name).catch(() => {});
+      });
+    }).catch(() => {});
   }
   return result;
 }
 
-function tryAutoLog(campaignId, type, title, content, authorId) {
+function tryAutoLog(campaignId, type, title, content, authorId, authorUsername = null) {
   if (!campaignId) return;
   import('./sessionLog.js').then(({ logToActiveSession }) => {
-    logToActiveSession(campaignId, type, title, content, authorId);
+    logToActiveSession(campaignId, type, title, content, authorId, authorUsername);
   }).catch(() => {});
 }
 

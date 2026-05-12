@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import client from './client.js';
 import config from './config.js';
+import { startWebServer } from './web/server.js';
+import { seedBaseContent } from './init/seedBaseContent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,3 +57,7 @@ if (!config.discord.token) {
 }
 
 client.login(config.discord.token);
+
+seedBaseContent().catch(err => console.error(chalk.red('Failed to seed base content:'), err));
+
+startWebServer().catch(err => console.error(chalk.red('Failed to start web server:'), err));

@@ -1,7 +1,8 @@
-import { SlashCommandBuilder, EmbedBuilder, Colors } from 'discord.js';
+﻿import { SlashCommandBuilder, EmbedBuilder, Colors } from 'discord.js';
 import { successEmbed, errorEmbed, infoEmbed } from '../utils/embeds.js';
 import { startAutoSession, stopAutoSession, getActiveSession, logToActiveSession, getSessionEvents, buildSessionSummary, syncToObsidian } from '../services/sessionLog.js';
 import { getCampaign, getSessionLogs, getSessionLog } from '../services/campaign.js';
+import { getActiveCharacter } from '../services/activeCharacter.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -84,9 +85,12 @@ export default {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
-    const campaignId = parseInt(interaction.options.getString('campaign-id'));
+    const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
+    const activeChar = getActiveCharacter(interaction.user.id);
+    const userName = interaction.member?.displayName || interaction.user.username;
+    const userRef = activeChar ? `${userName} (${activeChar.name})` : userName;
 
-    if (isNaN(campaignId) && !['start', 'stop', 'note', 'highlight', 'interaction', 'loot', 'milestone', 'status', 'history', 'sync'].includes(sub)) {
+    if (isNaN(campaignId)) {
       return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
     }
 
@@ -103,13 +107,13 @@ export default {
         return interaction.reply({ embeds: [infoEmbed('Already Logging', result.message)], ephemeral: true });
       }
 
-      const embed = successEmbed('🎙️ Live Session Started',
-        `Logging **${campaign.name}** — Session ${sessionNumber}${title ? ': ' + title : ''}`
+      const embed = successEmbed('ðŸŽ™ï¸ Live Session Started',
+        `Logging **${campaign.name}** â€” Session ${sessionNumber}${title ? ': ' + title : ''}`
       );
       embed.addFields(
         { name: 'Session ID', value: `\`${result.session.id}\``, inline: true },
         { name: 'Auto-Capture Active', value: 'HP changes, level ups, combat, and more will be auto-logged.', inline: false },
-        { name: 'Quick Commands', value: '`/session note` — Add a note\n`/session highlight` — Mark a highlight\n`/session interaction` — Log NPC talks\n`/session loot` — Record treasure\n`/session stop` — End session', inline: false },
+        { name: 'Quick Commands', value: '`/session note` â€” Add a note\n`/session highlight` â€” Mark a highlight\n`/session interaction` â€” Log NPC talks\n`/session loot` â€” Record treasure\n`/session stop` â€” End session', inline: false },
       );
       return interaction.reply({ embeds: [embed] });
     }
@@ -142,42 +146,42 @@ export default {
     if (sub === 'note') {
       const text = interaction.options.getString('text');
       const dmOnly = interaction.options.getBoolean('dm-only') || false;
-      const result = logToActiveSession(campaignId, 'note', 'Note', text, interaction.user.id, interaction.member?.displayName || interaction.user.username, dmOnly);
+      const result = logToActiveSession(campaignId, 'note', 'Note', text, interaction.user.id, userRef, dmOnly);
       if (!result) return interaction.reply({ embeds: [errorEmbed('No Active Session', 'Start a session with `/session start` first.')], ephemeral: true });
       const visibility = dmOnly ? ' (DM-only)' : '';
-      return interaction.reply({ embeds: [successEmbed('📌 Note Added' + visibility, text)], ephemeral: dmOnly });
+      return interaction.reply({ embeds: [successEmbed('ðŸ“Œ Note Added' + visibility, text)], ephemeral: dmOnly });
     }
 
     if (sub === 'highlight') {
       const text = interaction.options.getString('text');
-      const result = logToActiveSession(campaignId, 'milestone', '⭐ ' + text, text, interaction.user.id, interaction.member?.displayName || interaction.user.username);
+      const result = logToActiveSession(campaignId, 'milestone', 'â­ ' + text, text, interaction.user.id, userRef);
       if (!result) return interaction.reply({ embeds: [errorEmbed('No Active Session', 'Start a session with `/session start` first.')], ephemeral: true });
-      return interaction.reply({ embeds: [successEmbed('⭐ Highlight Recorded', text)] });
+      return interaction.reply({ embeds: [successEmbed('â­ Highlight Recorded', text)] });
     }
 
     if (sub === 'interaction') {
       const title = interaction.options.getString('title');
       const details = interaction.options.getString('details');
-      const result = logToActiveSession(campaignId, 'interaction', `💬 ${title}`, details, interaction.user.id, interaction.member?.displayName || interaction.user.username);
+      const result = logToActiveSession(campaignId, 'interaction', `ðŸ’¬ ${title}`, details, interaction.user.id, userRef);
       if (!result) return interaction.reply({ embeds: [errorEmbed('No Active Session', 'Start a session with `/session start` first.')], ephemeral: true });
-      return interaction.reply({ embeds: [successEmbed('💬 Interaction Logged', `**${title}**\n${details}`)] });
+      return interaction.reply({ embeds: [successEmbed('ðŸ’¬ Interaction Logged', `**${title}**\n${details}`)] });
     }
 
     if (sub === 'loot') {
       const items = interaction.options.getString('items');
       const gold = interaction.options.getString('gold');
       const content = items + (gold ? ` (${gold} gp)` : '');
-      const result = logToActiveSession(campaignId, 'loot', '💰 Treasure Found', content, interaction.user.id, interaction.member?.displayName || interaction.user.username);
+      const result = logToActiveSession(campaignId, 'loot', 'ðŸ’° Treasure Found', content, interaction.user.id, userRef);
       if (!result) return interaction.reply({ embeds: [errorEmbed('No Active Session', 'Start a session with `/session start` first.')], ephemeral: true });
-      return interaction.reply({ embeds: [successEmbed('💰 Loot Recorded', content)] });
+      return interaction.reply({ embeds: [successEmbed('ðŸ’° Loot Recorded', content)] });
     }
 
     if (sub === 'milestone') {
       const title = interaction.options.getString('title');
       const description = interaction.options.getString('description');
-      const result = logToActiveSession(campaignId, 'milestone', `🏆 ${title}`, description || title, interaction.user.id, interaction.member?.displayName || interaction.user.username);
+      const result = logToActiveSession(campaignId, 'milestone', `ðŸ† ${title}`, description || title, interaction.user.id, userRef);
       if (!result) return interaction.reply({ embeds: [errorEmbed('No Active Session', 'Start a session with `/session start` first.')], ephemeral: true });
-      return interaction.reply({ embeds: [successEmbed('🏆 Milestone Recorded', `${title}${description ? '\n' + description : ''}`)] });
+      return interaction.reply({ embeds: [successEmbed('ðŸ† Milestone Recorded', `${title}${description ? '\n' + description : ''}`)] });
     }
 
     if (sub === 'status') {
@@ -185,7 +189,7 @@ export default {
       if (!active) return interaction.reply({ embeds: [infoEmbed('No Active Session', 'No session is currently being logged. Start one with `/session start`.')], ephemeral: true });
 
       const summary = buildSessionSummary(active.session.id);
-      const embed = infoEmbed(`🎙️ Session ${active.session.session_number} — Active`,
+      const embed = infoEmbed(`ðŸŽ™ï¸ Session ${active.session.session_number} â€” Active`,
         `Started ${new Date(active.active.started_at).toLocaleString()} in <#${active.active.channel_id || ''}>`
       );
       embed.addFields(
@@ -213,20 +217,20 @@ export default {
       }
 
       const emoji = {
-        narrative: '📖', combat: '⚔️', interaction: '💬',
-        character_update: '📝', loot: '💰', note: '📌',
-        milestone: '⭐', roll: '🎲', location_change: '📍',
+        narrative: 'ðŸ“–', combat: 'âš”ï¸', interaction: 'ðŸ’¬',
+        character_update: 'ðŸ“', loot: 'ðŸ’°', note: 'ðŸ“Œ',
+        milestone: 'â­', roll: 'ðŸŽ²', location_change: 'ðŸ“',
       };
 
       const lines = recent.map(e => {
-        const em = emoji[e.type] || '•';
+        const em = emoji[e.type] || 'â€¢';
         const time = new Date(e.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         return `\`${time}\` ${em} **${e.title}**${e.content ? ': ' + e.content.substring(0, 100) : ''}`;
       });
 
       const chunks = chunkArray(lines, 20);
-      const embed = infoEmbed(`📜 Session Log — ${active.session.session_number} (${events.length} events)`,
-        chunks[0].join('\n') + (events.length > limit ? `\n\n*+${events.length - limit} more — use /session history limit: 100 to see all*` : '')
+      const embed = infoEmbed(`ðŸ“œ Session Log â€” ${active.session.session_number} (${events.length} events)`,
+        chunks[0].join('\n') + (events.length > limit ? `\n\n*+${events.length - limit} more â€” use /session history limit: 100 to see all*` : '')
       );
       return interaction.reply({ embeds: [embed] });
     }
@@ -239,7 +243,7 @@ export default {
       if (result.error) {
         return interaction.reply({ embeds: [errorEmbed('Sync Failed', result.error)], ephemeral: true });
       }
-      return interaction.reply({ embeds: [successEmbed('📝 Synced to Obsidian', `Session written to \`${result.path}\``)] });
+      return interaction.reply({ embeds: [successEmbed('ðŸ“ Synced to Obsidian', `Session written to \`${result.path}\``)] });
     }
   },
 };

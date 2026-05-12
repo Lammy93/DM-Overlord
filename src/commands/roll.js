@@ -2,6 +2,9 @@ import { SlashCommandBuilder } from 'discord.js';
 import { rollDice } from '../services/dice.js';
 import { diceEmbed } from '../utils/embeds.js';
 import { getNarration } from '../services/narration.js';
+import { getActiveCharacter } from '../services/activeCharacter.js';
+import { logToActiveSession } from '../services/sessionLog.js';
+import eventBus from '../services/eventBus.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -62,8 +65,42 @@ export default {
     }
     embed.addFields({ name: 'Roller', value: interaction.user.username, inline: true });
 
-    const narration = isD20 ? getNarrationForRoll(result.total, formula) : null;
+    const narration = isD20 ? getNarrationForRoll(result.total) : null;
     if (narration) embed.addFields({ name: 'Narration', value: narration });
+
+    if (!hidden) {
+      const activeChar = getActiveCharacter(interaction.user.id);
+      const playerName = interaction.member?.displayName || interaction.user.username;
+      const charName = activeChar ? activeChar.name : null;
+      const rollContent = charName
+        ? `**${charName}** rolled ${result.formula} → **${result.total}**${reason ? ` (${reason})` : ''}`
+        : `**${playerName}** rolled ${result.formula} → **${result.total}**${reason ? ` (${reason})` : ''}`;
+      const userRef = charName ? `${playerName} (${charName})` : playerName;
+
+      if (activeChar?.campaign_id) {
+        logToActiveSession(
+          activeChar.campaign_id,
+          'roll',
+          charName ? `${charName} — ${result.formula}` : `Roll — ${result.formula}`,
+          rollContent,
+          interaction.user.id,
+          userRef,
+        ).catch(() => {});
+      }
+
+      eventBus.emit('log', {
+        type: 'roll',
+        subtype: 'roll',
+        title: `🎲 ${result.formula}`,
+        content: `${userRef}: ${result.formula} → **${result.total}**${result.details ? ` (${result.details})` : ''}${reason ? ` — ${reason}` : ''}`,
+        formula: result.formula,
+        total: result.total,
+        userId: interaction.user.id,
+        username: playerName,
+        characterName: charName,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     await interaction.reply({
       embeds: [embed],
@@ -72,9 +109,7 @@ export default {
   },
 };
 
-function getNarrationForRoll(total, formula) {
-  const isD20 = formula.replace(/\s/g, '').match(/^1d20/i);
-  if (!isD20) return null;
+function getNarrationForRoll(total) {
   if (total === 20) return getNarration('crit');
   if (total === 1) return 'Natural 1! That\'s... unfortunate.';
   return null;

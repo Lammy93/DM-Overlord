@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
+import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import config from '../config.js';
@@ -9,20 +10,28 @@ const __dirname = dirname(__filename);
 
 async function loadAllCommands() {
   const commands = [];
-  const cmdFiles = [
-    './roll.js', './obsidian.js', './srd-cmd.js', './import-cmd.js', './adventure.js', './session.js',
-    './campaign/campaign.js', './character/character.js', './encounter/encounter.js',
-  ];
-  for (const file of cmdFiles) {
-    try {
-      const cmd = await import(`file:///${join(__dirname, file).replace(/\\/g, '/')}`);
-      if (cmd.default?.data) {
-        commands.push(cmd.default.data.toJSON());
+  const commandsDir = __dirname;
+
+  async function discoverFiles(dir) {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await discoverFiles(fullPath);
+      } else if (entry.name.endsWith('.js') && entry.name !== 'deploy.js') {
+        try {
+          const cmd = await import(`file:///${fullPath.replace(/\\/g, '/')}`);
+          if (cmd.default?.data) {
+            commands.push(cmd.default.data.toJSON());
+          }
+        } catch (err) {
+          console.error(`Error loading ${entry.name}:`, err.message);
+        }
       }
-    } catch (err) {
-      console.error(`Error loading ${file}:`, err.message);
     }
   }
+
+  await discoverFiles(commandsDir);
   return commands;
 }
 

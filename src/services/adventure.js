@@ -1,6 +1,7 @@
 import { getDb } from '../db/index.js';
 import { getNarration } from './narration.js';
 import { rollDice } from './dice.js';
+import { postToCampaignChannel, narrationEmbed, characterSpeechEmbed, logChoiceToDiscord, logSceneTransition } from './discordLog.js';
 
 export function createModule(data) {
   const db = getDb();
@@ -56,24 +57,92 @@ export function deleteModule(id) {
   db.prepare('DELETE FROM adventure_modules WHERE id = ?').run(id);
 }
 
+export function setLobbyMessageId(sessionId, messageId) {
+  const db = getDb();
+  db.prepare('UPDATE adventure_sessions SET variables = json_set(COALESCE(variables, \'{}\'), \'$.lobby_message_id\', ?) WHERE id = ?').run(messageId, sessionId);
+}
+
+export function getLobbyMessageId(session) {
+  return session?.variables?.lobby_message_id || null;
+}
+
 export function startAdventure(moduleId, campaignId, dmDiscordId) {
   const db = getDb();
   const mod = getModule(moduleId);
   if (!mod) return null;
 
+  // Check for existing lobby for this module+campaign
+  const existing = db.prepare("SELECT id FROM adventure_sessions WHERE module_id = ? AND campaign_id = ? AND state = 'not_started' AND current_scene_id IS NULL").get(moduleId, campaignId);
+  if (existing) return getSession(existing.id);
+
   const stmt = db.prepare(`
     INSERT INTO adventure_sessions (module_id, campaign_id, dm_discord_id, state, current_scene_id, variables, history, player_states)
-    VALUES (?, ?, ?, 'running', ?, ?, '[]', '{}')
+    VALUES (?, ?, ?, 'not_started', NULL, ?, '[]', '{}')
   `);
-  const firstScene = mod.scenes[0];
   const result = stmt.run(
     moduleId,
     campaignId || null,
     dmDiscordId,
-    firstScene?.id || null,
     JSON.stringify(mod.variables || {})
   );
   return getSession(result.lastInsertRowid);
+}
+
+export function lobbyJoin(sessionId, playerDiscordId, playerName, characterId, characterName) {
+  const db = getDb();
+  const session = getSession(sessionId);
+  if (!session || session.state !== 'not_started') return { error: 'No active lobby for this session.' };
+  const states = session.playerStates || {};
+  states[playerDiscordId] = { discordId: playerDiscordId, playerName, characterId, characterName, joinedAt: new Date().toISOString(), ready: false };
+  db.prepare('UPDATE adventure_sessions SET player_states = ? WHERE id = ?').run(JSON.stringify(states), sessionId);
+  return { success: true, players: Object.values(states) };
+}
+
+export function lobbyLeave(sessionId, playerDiscordId) {
+  const db = getDb();
+  const session = getSession(sessionId);
+  if (!session || session.state !== 'not_started') return { error: 'No active lobby.' };
+  const states = session.playerStates || {};
+  delete states[playerDiscordId];
+  db.prepare('UPDATE adventure_sessions SET player_states = ? WHERE id = ?').run(JSON.stringify(states), sessionId);
+  return { success: true };
+}
+
+export function lobbySetReady(sessionId, playerDiscordId, ready) {
+  const db = getDb();
+  const session = getSession(sessionId);
+  if (!session || session.state !== 'not_started') return { error: 'No active lobby.' };
+  const states = session.playerStates || {};
+  if (!states[playerDiscordId]) return { error: 'You are not in this lobby.' };
+  states[playerDiscordId].ready = ready;
+  db.prepare('UPDATE adventure_sessions SET player_states = ? WHERE id = ?').run(JSON.stringify(states), sessionId);
+  return { success: true, players: Object.values(states) };
+}
+
+export function lobbyStart(sessionId, dmDiscordId) {
+  const db = getDb();
+  const session = getSession(sessionId);
+  if (!session) return { error: 'Session not found.' };
+  if (session.state !== 'not_started') return { error: 'Session has not started yet.' };
+
+  // Allow session DM, campaign DM, and guild admins/co-dms to start
+  const isSessionDm = session.dm_discord_id === dmDiscordId;
+  const isGuildAdmin = session.campaign_id && (() => {
+    const campaign = db.prepare('SELECT guild_id FROM campaigns WHERE id = ?').get(session.campaign_id);
+    if (!campaign) return false;
+    return !!db.prepare("SELECT 1 FROM guild_admins WHERE guild_id = ? AND discord_id = ? AND role IN ('admin','co-dm')").get(campaign.guild_id, dmDiscordId);
+  })();
+  if (!isSessionDm && !isGuildAdmin) return { error: 'Only the DM or a guild admin can start the adventure.' };
+
+  const mod = getModule(session.module_id);
+  if (!mod) return { error: 'Module not found.' };
+  const firstScene = mod.scenes[0];
+  if (!firstScene) return { error: 'Module has no scenes.' };
+
+  db.prepare('UPDATE adventure_sessions SET state = ?, current_scene_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('running', firstScene.id, sessionId);
+  const updated = getSession(sessionId);
+  const rendered = renderSceneText(firstScene, updated);
+  return { session: updated, scene: rendered };
 }
 
 export function getSession(id) {
@@ -216,6 +285,14 @@ export function processChoice(sessionId, choiceId) {
   if (choice.nextScene) {
     goToScene(sessionId, choice.nextScene);
     const newScene = getCurrentScene(sessionId);
+    const newSession = getSession(sessionId);
+
+    logChoiceToDiscord(session.campaign_id, 'The Party', choice.label || choice.text, scene.title).catch(() => {});
+    if (newScene) {
+      const rendered = renderSceneText(newScene, newSession);
+      logSceneTransition(session.campaign_id, rendered?.title || newScene.title, rendered?.text || newScene.text || '').catch(() => {});
+    }
+
     return {
       success: true,
       choice: choice.label || choice.text,
@@ -223,6 +300,7 @@ export function processChoice(sessionId, choiceId) {
     };
   }
 
+  logChoiceToDiscord(session.campaign_id, 'The Party', choice.label || choice.text, scene.title).catch(() => {});
   return { success: true, choice: choice.label || choice.text };
 }
 

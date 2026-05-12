@@ -19,9 +19,9 @@ function parseFormula(formula) {
   if (!match) return null;
 
   return {
-    count: match[1] ? parseInt(match[1]) : 1,
-    sides: parseInt(match[2]),
-    modifier: match[3] ? parseInt(match[3]) : 0,
+    count: match[1] ? parseInt(match[1], 10) : 1,
+    sides: parseInt(match[2], 10),
+    modifier: match[3] ? parseInt(match[3], 10) : 0,
   };
 }
 

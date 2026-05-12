@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { testVaultConnection, writeCampaignNote, writeCharacterNote, writeSessionNote, writeEncounterNote } from '../services/obsidian.js';
 import { successEmbed, errorEmbed, infoEmbed } from '../utils/embeds.js';
-import { getCampaign } from '../services/campaign.js';
+import { getCampaign, getSessionLog } from '../services/campaign.js';
 import { getCharacter } from '../services/character.js';
 import { getEncounter } from '../services/encounter.js';
 
@@ -62,7 +62,7 @@ export default {
       }
 
       case 'sync-campaign': {
-        const campaignId = parseInt(interaction.options.getString('campaign-id'));
+        const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
         if (isNaN(campaignId)) {
           return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
         }
@@ -71,7 +71,10 @@ export default {
           return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
         }
         if (campaign.dm_discord_id !== interaction.user.id) {
-          return interaction.reply({ embeds: [errorEmbed('Permission Denied', 'Only the DM can sync this campaign.')], ephemeral: true });
+          const { isDm } = await import('../services/dmRoles.js');
+          if (!isDm(interaction.user.id)) {
+            return interaction.reply({ embeds: [errorEmbed('Permission Denied', 'Only the campaign DM or a global DM can sync this campaign.')], ephemeral: true });
+          }
         }
         const result = await writeCampaignNote(campaign);
         if (result.success) {
@@ -81,7 +84,7 @@ export default {
       }
 
       case 'sync-character': {
-        const charId = parseInt(interaction.options.getString('character-id'));
+        const charId = parseInt(interaction.options.getString('character-id'), 10);
         if (isNaN(charId)) {
           return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid character ID.')], ephemeral: true });
         }
@@ -89,7 +92,8 @@ export default {
         if (!character) {
           return interaction.reply({ embeds: [errorEmbed('Not Found', 'Character not found.')], ephemeral: true });
         }
-        const result = await writeCharacterNote(character, interaction.user.username);
+        const campaignName = character.campaign_id ? getCampaign(character.campaign_id)?.name : null;
+        const result = await writeCharacterNote(character, interaction.user.username, campaignName);
         if (result.success) {
           return interaction.reply({ embeds: [successEmbed('Character Synced', `Written to \`${result.path}\``)] });
         }
@@ -97,7 +101,7 @@ export default {
       }
 
       case 'sync-encounter': {
-        const encId = parseInt(interaction.options.getString('encounter-id'));
+        const encId = parseInt(interaction.options.getString('encounter-id'), 10);
         if (isNaN(encId)) {
           return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid encounter ID.')], ephemeral: true });
         }
@@ -114,11 +118,10 @@ export default {
       }
 
       case 'sync-session': {
-        const sessionId = parseInt(interaction.options.getString('session-id'));
+        const sessionId = parseInt(interaction.options.getString('session-id'), 10);
         if (isNaN(sessionId)) {
           return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid session ID.')], ephemeral: true });
         }
-        const { getSessionLog } = await import('../services/campaign.js');
         const session = getSessionLog(sessionId);
         if (!session) {
           return interaction.reply({ embeds: [errorEmbed('Not Found', 'Session log not found.')], ephemeral: true });

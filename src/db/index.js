@@ -27,7 +27,10 @@ function initializeSchema() {
     try {
       db.exec(stmt.trim() + ';');
     } catch (err) {
-      console.error(`Schema error: ${err.message}`);
+      // Silently skip ALTER TABLE errors (columns may already exist from prior runs)
+      if (!stmt.trim().toUpperCase().startsWith('ALTER TABLE')) {
+        console.error(`Schema error: ${err.message}`);
+      }
     }
   }
 }

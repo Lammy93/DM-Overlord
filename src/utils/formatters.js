@@ -31,10 +31,12 @@ export function parseDiceNotation(formula) {
   const regex = /^(\d*)d(\d+)([+-]\d+)?$/i;
   const match = formula.match(regex);
   if (!match) return null;
+  const count = match[1] ? parseInt(match[1], 10) : 1;
+  if (count < 1) return null;
   return {
-    count: match[1] ? parseInt(match[1]) : 1,
-    sides: parseInt(match[2]),
-    modifier: match[3] ? parseInt(match[3]) : 0,
+    count,
+    sides: parseInt(match[2], 10),
+    modifier: match[3] ? parseInt(match[3], 10) : 0,
   };
 }
 

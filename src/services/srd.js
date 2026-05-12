@@ -24,6 +24,13 @@ function loadJson(filename) {
   }
 }
 
+// Helper: get a property from an item's properties object, or from the root if flat
+function p(item, key, fallback = null) {
+  if (item.properties && item.properties[key] !== undefined && item.properties[key] !== '') return item.properties[key];
+  if (item[key] !== undefined && item[key] !== '') return item[key];
+  return fallback;
+}
+
 export function getSrdMonsters(level = null, environment = null) {
   if (!monstersCache) monstersCache = loadJson('monsters.json');
   let results = monstersCache;
@@ -31,23 +38,17 @@ export function getSrdMonsters(level = null, environment = null) {
   if (level !== null) {
     const crThreshold = Math.max(1, level / 4);
     results = results.filter(m => {
-      const cr = parseCr(m.challenge_rating);
+      const cr = parseCr(p(m, 'CR'));
       return cr <= crThreshold + 2 && cr >= Math.max(0, crThreshold - 2);
     });
-  }
-
-  if (environment) {
-    results = results.filter(m =>
-      m.environments?.some(e => e.toLowerCase() === environment.toLowerCase())
-    );
   }
 
   return results;
 }
 
-export function getSrdMonster(id) {
+export function getSrdMonster(name) {
   if (!monstersCache) monstersCache = loadJson('monsters.json');
-  return monstersCache.find(m => m.id === id || m.name.toLowerCase() === id.toLowerCase()) || null;
+  return monstersCache.find(m => m.name.toLowerCase() === name.toLowerCase()) || null;
 }
 
 export function searchMonsters(query) {
@@ -55,8 +56,8 @@ export function searchMonsters(query) {
   const q = query.toLowerCase();
   return monstersCache.filter(m =>
     m.name.toLowerCase().includes(q) ||
-    m.type?.toLowerCase().includes(q) ||
-    m.size?.toLowerCase() === q
+    p(m, 'Type', '').toLowerCase().includes(q) ||
+    p(m, 'Size', '').toLowerCase().includes(q)
   );
 }
 
@@ -64,16 +65,15 @@ export function getSrdSpells(level = null, school = null, class_ = null) {
   if (!spellsCache) spellsCache = loadJson('spells.json');
   let results = spellsCache;
 
-  if (level !== null) results = results.filter(s => s.level === level);
-  if (school) results = results.filter(s => s.school?.toLowerCase() === school.toLowerCase());
-  if (class_) results = results.filter(s => s.classes?.some(c => c.toLowerCase() === class_.toLowerCase()));
+  if (level !== null) results = results.filter(s => parseInt(p(s, 'Level', 0), 10) === level);
+  if (school) results = results.filter(s => p(s, 'School', '').toLowerCase() === school.toLowerCase());
 
   return results;
 }
 
-export function getSrdSpell(id) {
+export function getSrdSpell(name) {
   if (!spellsCache) spellsCache = loadJson('spells.json');
-  return spellsCache.find(s => s.id === id || s.name.toLowerCase() === id.toLowerCase()) || null;
+  return spellsCache.find(s => s.name.toLowerCase() === name.toLowerCase()) || null;
 }
 
 export function searchSpells(query) {
@@ -81,21 +81,21 @@ export function searchSpells(query) {
   const q = query.toLowerCase();
   return spellsCache.filter(s =>
     s.name.toLowerCase().includes(q) ||
-    s.school?.toLowerCase().includes(q)
+    p(s, 'School', '').toLowerCase().includes(q)
   );
 }
 
 export function getSrdItems(category = null, rarity = null) {
   if (!itemsCache) itemsCache = loadJson('items.json');
   let results = itemsCache;
-  if (category) results = results.filter(i => i.category?.toLowerCase() === category.toLowerCase());
-  if (rarity) results = results.filter(i => i.rarity?.toLowerCase() === rarity.toLowerCase());
+  if (category) results = results.filter(i => p(i, 'Category', '').toLowerCase() === category.toLowerCase());
+  if (rarity) results = results.filter(i => p(i, 'Item Rarity', '').toLowerCase() === rarity.toLowerCase());
   return results;
 }
 
-export function getSrdItem(id) {
+export function getSrdItem(name) {
   if (!itemsCache) itemsCache = loadJson('items.json');
-  return itemsCache.find(i => i.id === id || i.name.toLowerCase() === id.toLowerCase()) || null;
+  return itemsCache.find(i => i.name.toLowerCase() === name.toLowerCase()) || null;
 }
 
 export function searchItems(query) {
@@ -103,7 +103,7 @@ export function searchItems(query) {
   const q = query.toLowerCase();
   return itemsCache.filter(i =>
     i.name.toLowerCase().includes(q) ||
-    i.category?.toLowerCase().includes(q)
+    p(i, 'Category', '').toLowerCase().includes(q)
   );
 }
 
@@ -136,12 +136,9 @@ function parseCr(cr) {
 
 export function getAllMonsterTypes() {
   if (!monstersCache) monstersCache = loadJson('monsters.json');
-  return [...new Set(monstersCache.map(m => m.type).filter(Boolean))].sort();
+  return [...new Set(monstersCache.map(m => p(m, 'Type')).filter(Boolean))].sort();
 }
 
 export function getAllEnvironments() {
-  if (!monstersCache) monstersCache = loadJson('monsters.json');
-  const envs = new Set();
-  monstersCache.forEach(m => m.environments?.forEach(e => envs.add(e)));
-  return [...envs].sort();
+  return [];
 }

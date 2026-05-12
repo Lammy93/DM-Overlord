@@ -3,8 +3,8 @@ import { getDb } from '../db/index.js';
 export function saveSourceDocument(data) {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT INTO source_documents (campaign_id, title, author, source_type, raw_text, chapters, npcs, locations, encounters, items, monsters, summary, parsed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO source_documents (campaign_id, title, author, source_type, raw_text, chapters, npcs, locations, encounters, items, monsters, materials, summary, parsed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
   `);
   const result = stmt.run(
     data.campaignId || null,
@@ -18,6 +18,7 @@ export function saveSourceDocument(data) {
     JSON.stringify(data.encounters || []),
     JSON.stringify(data.items || []),
     JSON.stringify(data.monsters || []),
+    JSON.stringify(data.materials || []),
     data.summary || null,
   );
   const docId = result.lastInsertRowid;
@@ -76,6 +77,8 @@ export async function convertDocumentToModule(docId, campaignId, authorDiscordId
   const parsedNpcs = typeof doc.npcs === 'string' ? JSON.parse(doc.npcs) : doc.npcs;
   const parsedMonsters = typeof doc.monsters === 'string' ? JSON.parse(doc.monsters) : doc.monsters;
   const parsedItems = typeof doc.items === 'string' ? JSON.parse(doc.items) : doc.items;
+  const parsedMaterials = typeof doc.materials === 'string' ? JSON.parse(doc.materials) : (doc.materials || []);
+  const parsedLocations = typeof doc.locations === 'string' ? JSON.parse(doc.locations) : (doc.locations || []);
 
   const allScenes = [];
   for (const ch of (doc.chapters || [])) {
@@ -102,6 +105,8 @@ export async function convertDocumentToModule(docId, campaignId, authorDiscordId
       npcs: parsedNpcs || [],
       monsters: parsedMonsters || [],
       items: parsedItems || [],
+      materials: parsedMaterials || [],
+      locations: parsedLocations || [],
     },
   };
 
@@ -122,5 +127,6 @@ function parseDocFields(doc) {
     encounters: parse(doc.encounters),
     items: parse(doc.items),
     monsters: parse(doc.monsters),
+    materials: parse(doc.materials),
   };
 }

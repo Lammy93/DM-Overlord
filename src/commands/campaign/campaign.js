@@ -1,7 +1,10 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { successEmbed, errorEmbed, infoEmbed } from '../../utils/embeds.js';
 import { createCampaign, getCampaign, listCampaigns, updateCampaign, deleteCampaign, addPlayer, removePlayer, getCampaignPlayers, createSessionLog, getSessionLogs, addLocation, getLocations, addNote, getNotes } from '../../services/campaign.js';
+import { getCampaignMaps, addMap } from '../../services/maps.js';
 import { writeCampaignNote } from '../../services/obsidian.js';
+import { generateMapAI } from '../../services/aiGenerator.js';
+import config from '../../config.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -79,8 +82,33 @@ export default {
           { name: 'Quest', value: 'quest' },
           { name: 'NPC', value: 'npc' },
           { name: 'Lore', value: 'lore' },
-        ))),
+        )))
+    .addSubcommandGroup(sub =>
+      sub.setName('map').setDescription('Manage campaign maps')
+        .addSubcommand(cmd =>
+          cmd.setName('add')
+            .setDescription('Add a map to the campaign')
+            .addStringOption(opt => opt.setName('campaign-id').setDescription('Campaign ID').setRequired(true))
+            .addStringOption(opt => opt.setName('name').setDescription('Map name').setRequired(true))
+            .addStringOption(opt => opt.setName('image-url').setDescription('Image URL').setRequired(true))
+            .addIntegerOption(opt => opt.setName('grid-size').setDescription('Grid size in pixels (default: 50)').setRequired(false).setMinValue(10).setMaxValue(200))
+            .addStringOption(opt => opt.setName('notes').setDescription('Notes about the map').setRequired(false)))
+        .addSubcommand(cmd =>
+          cmd.setName('list')
+            .setDescription('List maps for a campaign')
+            .addStringOption(opt => opt.setName('campaign-id').setDescription('Campaign ID').setRequired(true)))
+        .addSubcommand(cmd =>
+          cmd.setName('generate')
+            .setDescription('AI-generate a map with points of interest')
+            .addStringOption(opt => opt.setName('campaign-id').setDescription('Campaign ID').setRequired(true))
+            .addStringOption(opt => opt.setName('location').setDescription('Location name to generate a map for').setRequired(true))
+            .addStringOption(opt => opt.setName('description').setDescription('Brief description of the area').setRequired(false)))),
   async execute(interaction) {
+    const group = interaction.options.getSubcommandGroup(false);
+    if (group === 'map') {
+      return handleMapSubcommand(interaction);
+    }
+
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'create') {
@@ -92,9 +120,10 @@ export default {
         dmDiscordId: interaction.user.id,
         guildId: interaction.guildId,
         channelId: interaction.channelId,
-        startingLevel: interaction.options.getInteger('starting-level') || 1,
+        startingLevel: interaction.options.getInteger('starting-level') ?? 1,
       };
       const campaign = createCampaign(data);
+      writeCampaignNote(campaign).catch(() => {});
       const embed = successEmbed('Campaign Created', `**${campaign.name}** is ready!`);
       embed.addFields(
         { name: 'ID', value: `\`${campaign.id}\``, inline: true },
@@ -106,6 +135,7 @@ export default {
     }
 
     if (sub === 'list') {
+      // Show all campaigns the DM owns across all guilds
       const campaigns = listCampaigns(interaction.user.id, 'dm');
       if (campaigns.length === 0) {
         return interaction.reply({ embeds: [infoEmbed('No Campaigns', 'You have no campaigns yet. Use `/campaign create` to start one.')], ephemeral: true });
@@ -117,7 +147,7 @@ export default {
     }
 
     if (sub === 'info') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(id);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -140,7 +170,7 @@ export default {
     }
 
     if (sub === 'update') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(id);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -160,7 +190,7 @@ export default {
     }
 
     if (sub === 'delete') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(id);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -172,7 +202,7 @@ export default {
     }
 
     if (sub === 'add-player') {
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
       if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(campaignId);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -186,7 +216,7 @@ export default {
     }
 
     if (sub === 'remove-player') {
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
       if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(campaignId);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -199,7 +229,7 @@ export default {
     }
 
     if (sub === 'session') {
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
       if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(campaignId);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -224,7 +254,7 @@ export default {
     }
 
     if (sub === 'sessions') {
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
       if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(campaignId);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -239,7 +269,7 @@ export default {
     }
 
     if (sub === 'note') {
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
       if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(campaignId);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -256,3 +286,65 @@ export default {
     }
   },
 };
+
+async function handleMapSubcommand(interaction) {
+  const sub = interaction.options.getSubcommand();
+  const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
+  if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
+  const campaign = getCampaign(campaignId);
+  if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
+
+  if (sub === 'list') {
+    const maps = getCampaignMaps(campaignId);
+    if (maps.length === 0) {
+      return interaction.reply({ embeds: [infoEmbed('No Maps', `No maps for **${campaign.name}**. Add one with \`/campaign map add\`.`)] });
+    }
+    const list = maps.map(m => `**${m.name}** — ${m.notes || ''} ${m.grid_size ? `(Grid: ${m.grid_size}px)` : ''}`.trim()).join('\n');
+    return interaction.reply({ embeds: [infoEmbed(`🗺️ ${campaign.name} — Maps`, list)] });
+  }
+
+  if (sub === 'add') {
+    if (campaign.dm_discord_id !== interaction.user.id) {
+      return interaction.reply({ embeds: [errorEmbed('Permission Denied', 'Only the DM can add maps.')], ephemeral: true });
+    }
+    const map = addMap(campaignId, {
+      name: interaction.options.getString('name'),
+      imageUrl: interaction.options.getString('image-url'),
+      gridSize: interaction.options.getInteger('grid-size') || 50,
+      notes: interaction.options.getString('notes'),
+    });
+    const baseUrl = process.env.WEB_BASE_URL || `http://localhost:${config.web?.port || 3000}`;
+    return interaction.reply({ embeds: [successEmbed('Map Added', `**${map.name}** added to ${campaign.name}.\n\nView at: ${baseUrl}/#map/${map.id}`)] });
+  }
+
+  if (sub === 'generate') {
+    if (campaign.dm_discord_id !== interaction.user.id) {
+      return interaction.reply({ embeds: [errorEmbed('Permission Denied', 'Only the DM can generate maps.')], ephemeral: true });
+    }
+
+    await interaction.deferReply();
+
+    const location = interaction.options.getString('location');
+    const description = interaction.options.getString('description') || '';
+
+    try {
+      const result = await generateMapAI(campaignId, campaign.name, location, description);
+      const embed = successEmbed('AI Map Generated', `**${result.map.name}** added to **${campaign.name}**`);
+      embed.addFields(
+        { name: 'Map ID', value: `\`${result.map.id}\``, inline: true },
+        { name: 'Grid Size', value: `${result.map.grid_size}px`, inline: true },
+        { name: 'Points of Interest', value: `${result.pins.length} pins placed`, inline: true },
+        { name: 'Atmosphere', value: result.atmosphere || 'None', inline: false },
+      );
+      if (result.suggested_encounters?.length > 0) {
+        embed.addFields({ name: 'Suggested Encounters', value: result.suggested_encounters.join(', '), inline: false });
+      }
+      embed.addFields(
+        { name: 'View Map', value: `${process.env.WEB_BASE_URL || `http://localhost:${config.web?.port || 3000}`}/#map/${result.map.id}`, inline: false },
+      );
+      return interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      return interaction.editReply({ embeds: [errorEmbed('Generation Failed', e.message)] });
+    }
+  }
+}

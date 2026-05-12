@@ -4,6 +4,7 @@ import { createEncounter, getEncounter, listEncounters, updateEncounter, addComb
 import { getCampaign } from '../../services/campaign.js';
 import { getSrdMonster, searchMonsters } from '../../services/srd.js';
 import { getNarration, generateEncounterDescription } from '../../services/narration.js';
+import { generateEncounterAI } from '../../services/aiGenerator.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -22,6 +23,19 @@ export default {
           { name: 'Hard', value: 'hard' },
           { name: 'Deadly', value: 'deadly' },
         )))
+    .addSubcommand(sub =>
+      sub.setName('generate')
+        .setDescription('AI-generate a balanced encounter')
+        .addStringOption(opt => opt.setName('campaign-id').setDescription('Campaign ID').setRequired(true))
+        .addStringOption(opt => opt.setName('environment').setDescription('Environment (e.g., forest, dungeon, cave)').setRequired(false))
+        .addStringOption(opt => opt.setName('difficulty').setDescription('Difficulty rating').setRequired(false).addChoices(
+          { name: 'Easy', value: 'easy' },
+          { name: 'Medium', value: 'medium' },
+          { name: 'Hard', value: 'hard' },
+          { name: 'Deadly', value: 'deadly' },
+        ))
+        .addIntegerOption(opt => opt.setName('party-level').setDescription('Average party level (default: campaign starting level)').setRequired(false).setMinValue(1).setMaxValue(20))
+        .addIntegerOption(opt => opt.setName('party-size').setDescription('Number of party members (default: 4)').setRequired(false).setMinValue(1).setMaxValue(10)))
     .addSubcommand(sub =>
       sub.setName('list')
         .setDescription('List encounters for a campaign')
@@ -79,7 +93,7 @@ export default {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'create') {
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
       if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const campaign = getCampaign(campaignId);
       if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
@@ -102,8 +116,46 @@ export default {
       return interaction.reply({ embeds: [embed] });
     }
 
+    if (sub === 'generate') {
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
+      if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
+      const campaign = getCampaign(campaignId);
+      if (!campaign) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Campaign not found.')], ephemeral: true });
+      if (campaign.dm_discord_id !== interaction.user.id) {
+        return interaction.reply({ embeds: [errorEmbed('Permission Denied', 'Only the DM can generate encounters.')], ephemeral: true });
+      }
+
+      await interaction.deferReply();
+
+      const env = interaction.options.getString('environment') || 'wilderness';
+      const difficulty = interaction.options.getString('difficulty') || 'medium';
+      const partyLevel = interaction.options.getInteger('party-level') || campaign.starting_level || 1;
+      const partySize = interaction.options.getInteger('party-size') || 4;
+
+      try {
+        const result = await generateEncounterAI(campaignId, partyLevel, partySize, env, difficulty);
+        const embed = successEmbed('AI Encounter Generated', `**${result.encounter.name}** ready for **${campaign.name}**`);
+        embed.addFields(
+          { name: 'Encounter ID', value: `\`${result.encounter.id}\``, inline: true },
+          { name: 'Difficulty', value: difficulty, inline: true },
+          { name: 'Environment', value: env, inline: true },
+          { name: 'Party', value: `Level ${partyLevel} · ${partySize} players`, inline: true },
+          { name: 'Monsters', value: result.monsters.map(m => `${m.name} x${m.count}`).join(', ') || 'None', inline: false },
+        );
+        if (result.loot) embed.addFields({ name: 'Loot', value: result.loot.substring(0, 200), inline: false });
+        if (result.xp_reward) embed.addFields({ name: 'XP Reward', value: `${result.xp_reward}`, inline: true });
+        if (result.dm_notes) embed.addFields({ name: 'DM Notes', value: result.dm_notes.substring(0, 200), inline: false });
+        if (result.environmental_features?.length > 0) {
+          embed.addFields({ name: 'Environmental Features', value: result.environmental_features.join(', '), inline: false });
+        }
+        return interaction.editReply({ embeds: [embed] });
+      } catch (e) {
+        return interaction.editReply({ embeds: [errorEmbed('Generation Failed', e.message)] });
+      }
+    }
+
     if (sub === 'list') {
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
       if (isNaN(campaignId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid campaign ID.')], ephemeral: true });
       const encounters = listEncounters(campaignId);
       if (encounters.length === 0) {
@@ -116,7 +168,7 @@ export default {
     }
 
     if (sub === 'view') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid encounter ID.')], ephemeral: true });
       const encounter = getEncounter(id);
       if (!encounter) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Encounter not found.')], ephemeral: true });
@@ -124,7 +176,7 @@ export default {
     }
 
     if (sub === 'add-monster') {
-      const encounterId = parseInt(interaction.options.getString('encounter-id'));
+      const encounterId = parseInt(interaction.options.getString('encounter-id'), 10);
       if (isNaN(encounterId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID', 'Please provide a valid encounter ID.')], ephemeral: true });
       const encounter = getEncounter(encounterId);
       if (!encounter) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Encounter not found.')], ephemeral: true });
@@ -141,7 +193,8 @@ export default {
       const added = [];
       for (let i = 0; i < count; i++) {
         const name = count > 1 ? `${monster.name} ${i + 1}` : monster.name;
-        const initiative = Math.floor(Math.random() * 20) + 1 + Math.floor((monster.stats.dex - 10) / 2);
+        const dexBonus = monster.stats?.dex != null ? Math.floor((monster.stats.dex - 10) / 2) : 0;
+        const initiative = Math.floor(Math.random() * 20) + 1 + dexBonus;
         const combatant = addCombatant(encounterId, {
           name,
           type: 'monster',
@@ -163,7 +216,7 @@ export default {
     }
 
     if (sub === 'add-custom') {
-      const encounterId = parseInt(interaction.options.getString('encounter-id'));
+      const encounterId = parseInt(interaction.options.getString('encounter-id'), 10);
       if (isNaN(encounterId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const encounter = getEncounter(encounterId);
       if (!encounter) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Encounter not found.')], ephemeral: true });
@@ -178,7 +231,7 @@ export default {
     }
 
     if (sub === 'remove') {
-      const combatantId = parseInt(interaction.options.getString('combatant-id'));
+      const combatantId = parseInt(interaction.options.getString('combatant-id'), 10);
       if (isNaN(combatantId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const result = removeCombatant(combatantId);
       if (!result) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Combatant not found.')], ephemeral: true });
@@ -186,11 +239,11 @@ export default {
     }
 
     if (sub === 'start') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const encounter = getEncounter(id);
       if (!encounter) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Encounter not found.')], ephemeral: true });
-      if (encounter.combatants.length === 0) {
+      if (!encounter.combatants || encounter.combatants.length === 0) {
         return interaction.reply({ embeds: [errorEmbed('No Combatants', 'Add combatants before starting.')], ephemeral: true });
       }
       const updated = startEncounter(id);
@@ -206,7 +259,7 @@ export default {
     }
 
     if (sub === 'next') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const encounter = getEncounter(id);
       if (!encounter) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Encounter not found.')], ephemeral: true });
@@ -220,7 +273,7 @@ export default {
     }
 
     if (sub === 'damage') {
-      const combatantId = parseInt(interaction.options.getString('combatant-id'));
+      const combatantId = parseInt(interaction.options.getString('combatant-id'), 10);
       const amount = interaction.options.getInteger('amount');
       if (isNaN(combatantId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const updated = damageCombatant(combatantId, amount);
@@ -235,7 +288,7 @@ export default {
     }
 
     if (sub === 'condition') {
-      const combatantId = parseInt(interaction.options.getString('combatant-id'));
+      const combatantId = parseInt(interaction.options.getString('combatant-id'), 10);
       const condition = interaction.options.getString('condition').toLowerCase();
       if (isNaN(combatantId)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const updated = addCondition(combatantId, condition);
@@ -244,15 +297,16 @@ export default {
     }
 
     if (sub === 'end') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const encounter = getEncounter(id);
       if (!encounter) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Encounter not found.')], ephemeral: true });
       endEncounter(id, 'completed');
       const embed = successEmbed('Encounter Ended', `**${encounter.name}** has concluded!`);
       embed.addFields({ name: 'Total Rounds', value: `${encounter.round || 0}`, inline: true });
-      const alive = encounter.combatants.filter(c => c.hp_current > 0).length;
-      embed.addFields({ name: 'Survivors', value: `${alive}/${encounter.combatants.length}`, inline: true });
+      const combatants = encounter.combatants || [];
+      const alive = combatants.filter(c => c.hp_current > 0).length;
+      embed.addFields({ name: 'Survivors', value: `${alive}/${combatants.length}`, inline: true });
       return interaction.reply({ embeds: [embed] });
     }
   },

@@ -3,15 +3,95 @@ import { writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { extractTextFromPdf, chunkText, extractTableOfContents } from '../services/pdfParser.js';
-import { parseCampaignText, refineWithAI } from '../services/aiParser.js';
+import { parseCampaignText, refineWithAI, hasAI } from '../services/aiParser.js';
 import { saveSourceDocument, getDocument, listDocuments, searchDocuments, deleteDocument, convertDocumentToModule } from '../services/sourceDocs.js';
 import { successEmbed, errorEmbed, infoEmbed, warningEmbed } from '../utils/embeds.js';
 import { getCampaign } from '../services/campaign.js';
-import config from '../config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const UPLOAD_DIR = join(__dirname, '..', '..', 'data', 'uploads');
+
+function isValidUrl(string) {
+  try {
+    const url = new URL(string);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    const hostname = url.hostname.toLowerCase();
+    // Block private/external network ranges
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' ||
+        hostname === '[::1]' || hostname.startsWith('10.') || hostname.startsWith('172.16.') ||
+        hostname.startsWith('192.168.') || hostname.endsWith('.local') ||
+        hostname.endsWith('.internal')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function processPdfBuffer(buffer, filename, campaignId, interaction, title) {
+  const filePath = join(UPLOAD_DIR, `import_${Date.now()}_${filename}`);
+  const parsed = { title: title || filename.replace('.pdf', ''), chapters: [], npcs: [], locations: [], monsters: [], items: [] };
+
+  try {
+    writeFileSync(filePath, buffer);
+    await interaction.editReply({ embeds: [infoEmbed('Extracting Text...', 'Reading PDF content... This may take a minute for large books.')] });
+    const pdfData = await extractTextFromPdf(filePath);
+    parsed.title = pdfData.title || parsed.title;
+    const toc = extractTableOfContents(pdfData.text);
+    const aiAvailable = hasAI();
+    const progressEmbed = aiAvailable
+      ? infoEmbed('Parsing with AI...', `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\nProcessing through AI in chunks...\n${toc.length > 0 ? `Detected ${toc.length} chapters in table of contents.` : ''}`)
+      : warningEmbed('AI Not Configured', `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\nNo AI provider configured — storing raw text without AI parsing.\nSet AI_PROVIDER and API key in .env to enable structured extraction.`);
+    await interaction.editReply({ embeds: [progressEmbed] });
+    const aiResult = await parseCampaignText(pdfData.text, parsed.title, (current, total, stage) => {
+      if (stage === 'done') return;
+      interaction.editReply({ embeds: [infoEmbed('Parsing with AI...', `Processing chunk ${current} of ${total}...\nExtracted ${pdfData.pages} pages, ${pdfData.text.length} total characters.\nBreaking text into ${total} segments for full coverage.`)] }).catch(() => {});
+    });
+    parsed.title = aiResult.title || parsed.title;
+    parsed.summary = aiResult.summary || '';
+    parsed.chapters = aiResult.chapters || [];
+    parsed.npcs = aiResult.npcs || [];
+    parsed.locations = aiResult.locations || [];
+    parsed.monsters = aiResult.monsters || [];
+    parsed.items = aiResult.items || [];
+    parsed.materials = aiResult.materials || [];
+    const doc = saveSourceDocument({
+      campaignId,
+      title: parsed.title,
+      author: pdfData.metadata?.author || null,
+      sourceType: 'pdf',
+      rawText: pdfData.text.slice(0, 500000),
+      chapters: parsed.chapters,
+      npcs: parsed.npcs,
+      locations: parsed.locations,
+      encounters: [],
+      items: parsed.items,
+      monsters: parsed.monsters,
+      summary: parsed.summary,
+    });
+    const embed = successEmbed('Campaign Imported!', `**${doc.title}** has been parsed and stored.`);
+    embed.addFields(
+      { name: 'Document ID', value: `\`${doc.id}\``, inline: true },
+      { name: 'Pages', value: `${pdfData.pages}`, inline: true },
+      { name: 'Chapters', value: `${parsed.chapters.length}`, inline: true },
+      { name: 'NPCs', value: `${parsed.npcs.length}`, inline: true },
+      { name: 'Locations', value: `${parsed.locations.length}`, inline: true },
+      { name: 'Monsters', value: `${parsed.monsters.length}`, inline: true },
+      { name: 'Items', value: `${parsed.items.length}`, inline: true },
+      { name: 'Materials', value: `${(parsed.materials || []).length}`, inline: true },
+      { name: 'Next Step', value: aiAvailable ? 'Use `/import convert` to turn this into a playable adventure module.' : 'Set AI_PROVIDER and API key in .env then re-import for AI parsing.', inline: false },
+    );
+    await interaction.editReply({ embeds: [embed] });
+  } catch (err) {
+    await interaction.editReply({ embeds: [errorEmbed('Import Failed', `Error: ${err.message}`)] });
+  } finally {
+    if (existsSync(filePath)) {
+      try { unlinkSync(filePath); } catch { /* ignore cleanup errors */ }
+    }
+  }
+}
 
 export default {
   data: new SlashCommandBuilder()
@@ -57,200 +137,42 @@ export default {
 
     if (sub === 'pdf') {
       await interaction.deferReply();
-
       const file = interaction.options.getAttachment('file');
       const campaignId = interaction.options.getString('campaign-id')
-        ? parseInt(interaction.options.getString('campaign-id')) : null;
-
+        ? parseInt(interaction.options.getString('campaign-id'), 10) : null;
       if (!file.name.toLowerCase().endsWith('.pdf')) {
         return interaction.editReply({ embeds: [errorEmbed('Invalid File', 'Only PDF files are accepted.')] });
       }
-
-      if (!existsSync(UPLOAD_DIR)) {
-        mkdirSync(UPLOAD_DIR, { recursive: true });
-      }
-
-      const filePath = join(UPLOAD_DIR, `import_${Date.now()}_${file.name}`);
-      const parsed = { title: file.name.replace('.pdf', ''), chapters: [], npcs: [], locations: [], monsters: [], items: [] };
-
-      try {
-        await interaction.editReply({ embeds: [infoEmbed('Downloading...', 'Fetching your PDF file...')] });
-
-        const response = await fetch(file.url);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        writeFileSync(filePath, buffer);
-
-        await interaction.editReply({ embeds: [infoEmbed('Extracting Text...', 'Reading PDF content... This may take a minute for large books.')] });
-
-        const pdfData = await extractTextFromPdf(filePath);
-        parsed.title = pdfData.title;
-
-        const toc = extractTableOfContents(pdfData.text);
-        const hasAI = !!config.ai.openaiKey;
-        const progressEmbed = hasAI
-          ? infoEmbed('Parsing with AI...',
-              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
-              `Sending to AI for structural analysis...\n` +
-              (toc.length > 0 ? `Detected ${toc.length} chapters in table of contents.` : ''))
-          : warningEmbed('AI Not Configured',
-              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
-              `No OPENAI_API_KEY set — storing raw text without AI parsing.\n` +
-              `Set it in .env to enable automatic NPC/location/monster extraction.`);
-        await interaction.editReply({ embeds: [progressEmbed] });
-
-        const aiResult = await parseCampaignText(pdfData.text, parsed.title);
-
-        parsed.title = aiResult.title || parsed.title;
-        parsed.summary = aiResult.summary || '';
-        parsed.chapters = aiResult.chapters || [];
-        parsed.npcs = aiResult.npcs || [];
-        parsed.locations = aiResult.locations || [];
-        parsed.monsters = aiResult.monsters || [];
-        parsed.items = aiResult.items || [];
-
-        const doc = saveSourceDocument({
-          campaignId,
-          title: parsed.title,
-          author: pdfData.metadata?.author || null,
-          sourceType: 'pdf',
-          rawText: pdfData.text.slice(0, 50000),
-          chapters: parsed.chapters,
-          npcs: parsed.npcs,
-          locations: parsed.locations,
-          encounters: [],
-          items: parsed.items,
-          monsters: parsed.monsters,
-          summary: parsed.summary,
-        });
-
-        const embed = successEmbed('Campaign Imported!',
-          `**${doc.title}** has been parsed and stored.`
-        );
-        embed.addFields(
-          { name: 'Document ID', value: `\`${doc.id}\``, inline: true },
-          { name: 'Pages', value: `${pdfData.pages}`, inline: true },
-          { name: 'Chapters', value: `${parsed.chapters.length}`, inline: true },
-          { name: 'NPCs', value: `${parsed.npcs.length}`, inline: true },
-          { name: 'Locations', value: `${parsed.locations.length}`, inline: true },
-          { name: 'Monsters', value: `${parsed.monsters.length}`, inline: true },
-          { name: 'Items', value: `${parsed.items.length}`, inline: true },
-          { name: 'Next Step', value: hasAI ? 'Use `/import convert` to turn this into a playable adventure module.' : 'Set OPENAI_API_KEY in .env then re-import for AI parsing.', inline: false },
-        );
-        await interaction.editReply({ embeds: [embed] });
-
-      } catch (err) {
-        await interaction.editReply({
-          embeds: [errorEmbed('Import Failed', `Error: ${err.message}`)],
-        });
-      } finally {
-        if (existsSync(filePath)) unlinkSync(filePath);
-      }
+      if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+      await interaction.editReply({ embeds: [infoEmbed('Downloading...', 'Fetching your PDF file...')] });
+      const response = await fetch(file.url);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await processPdfBuffer(buffer, file.name, campaignId, interaction);
       return;
     }
 
     if (sub === 'url') {
       await interaction.deferReply();
-
       let url = interaction.options.getString('url');
       const campaignId = interaction.options.getString('campaign-id')
-        ? parseInt(interaction.options.getString('campaign-id')) : null;
-
+        ? parseInt(interaction.options.getString('campaign-id'), 10) : null;
       url = resolveDownloadUrl(url);
-
-      if (!url.toLowerCase().match(/\.pdf($|\?|#)/) && !url.toLowerCase().includes('pdf')) {
-        return interaction.editReply({ embeds: [errorEmbed('Invalid URL', 'URL must point to a PDF file.')] });
+      if (!isValidUrl(url)) {
+        return interaction.editReply({ embeds: [errorEmbed('Invalid URL', 'URL must be a publicly accessible PDF link. Local/intranet URLs are not allowed.')] });
       }
-
-      if (!existsSync(UPLOAD_DIR)) {
-        mkdirSync(UPLOAD_DIR, { recursive: true });
-      }
-
+      if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+      await interaction.editReply({ embeds: [infoEmbed('Downloading...', `Fetching PDF from URL...\n${url}`)] });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'DM-Overlord/1.0' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!response.ok) throw new Error(`Download failed with HTTP ${response.status}`);
+      const buffer = Buffer.from(await response.arrayBuffer());
       const filename = url.split('/').pop()?.split('?')[0] || `import_${Date.now()}.pdf`;
-      const filePath = join(UPLOAD_DIR, `url_${Date.now()}_${filename}`);
-      const parsed = { title: filename.replace('.pdf', ''), chapters: [], npcs: [], locations: [], monsters: [], items: [] };
-
-      try {
-        await interaction.editReply({ embeds: [infoEmbed('Downloading...', `Fetching PDF from URL...\n${url}`)] });
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 120000);
-        const response = await fetch(url, {
-          headers: { 'User-Agent': 'DM-Overlord/1.0' },
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        if (!response.ok) {
-          throw new Error(`Download failed with HTTP ${response.status}`);
-        }
-        const buffer = Buffer.from(await response.arrayBuffer());
-        writeFileSync(filePath, buffer);
-
-        const fileSizeMB = (buffer.length / 1024 / 1024).toFixed(2);
-        await interaction.editReply({ embeds: [infoEmbed('Extracting Text...', `Downloaded ${fileSizeMB} MB. Reading PDF content... This may take a minute for large books.`)] });
-
-        const pdfData = await extractTextFromPdf(filePath);
-        parsed.title = pdfData.title || parsed.title;
-
-        const toc = extractTableOfContents(pdfData.text);
-        const hasAI = !!config.ai.openaiKey;
-        const progressEmbed = hasAI
-          ? infoEmbed('Parsing with AI...',
-              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
-              `Sending to AI for structural analysis...\n` +
-              (toc.length > 0 ? `Detected ${toc.length} chapters in table of contents.` : ''))
-          : warningEmbed('AI Not Configured',
-              `Extracted ${pdfData.pages} pages, ${pdfData.text.length} characters.\n` +
-              `No OPENAI_API_KEY set — storing raw text without AI parsing.\n` +
-              `Set it in .env to enable automatic NPC/location/monster extraction.`);
-        await interaction.editReply({ embeds: [progressEmbed] });
-
-        const aiResult = await parseCampaignText(pdfData.text, parsed.title);
-
-        parsed.title = aiResult.title || parsed.title;
-        parsed.summary = aiResult.summary || '';
-        parsed.chapters = aiResult.chapters || [];
-        parsed.npcs = aiResult.npcs || [];
-        parsed.locations = aiResult.locations || [];
-        parsed.monsters = aiResult.monsters || [];
-        parsed.items = aiResult.items || [];
-
-        const doc = saveSourceDocument({
-          campaignId,
-          title: parsed.title,
-          author: pdfData.metadata?.author || null,
-          sourceType: 'pdf',
-          rawText: pdfData.text.slice(0, 50000),
-          chapters: parsed.chapters,
-          npcs: parsed.npcs,
-          locations: parsed.locations,
-          encounters: [],
-          items: parsed.items,
-          monsters: parsed.monsters,
-          summary: parsed.summary,
-        });
-
-        const embed = successEmbed('Campaign Imported from URL!',
-          `**${doc.title}** has been parsed and stored.`
-        );
-        embed.addFields(
-          { name: 'Document ID', value: `\`${doc.id}\``, inline: true },
-          { name: 'Pages', value: `${pdfData.pages}`, inline: true },
-          { name: 'Chapters', value: `${parsed.chapters.length}`, inline: true },
-          { name: 'NPCs', value: `${parsed.npcs.length}`, inline: true },
-          { name: 'Locations', value: `${parsed.locations.length}`, inline: true },
-          { name: 'Monsters', value: `${parsed.monsters.length}`, inline: true },
-          { name: 'Items', value: `${parsed.items.length}`, inline: true },
-          { name: 'Next Step', value: hasAI ? 'Use `/import convert` to turn this into a playable adventure module.' : 'Set OPENAI_API_KEY in .env then re-import for AI parsing.', inline: false },
-        );
-        await interaction.editReply({ embeds: [embed] });
-
-      } catch (err) {
-        await interaction.editReply({
-          embeds: [errorEmbed('Import Failed', `Error: ${err.message}`)],
-        });
-      } finally {
-        if (existsSync(filePath)) unlinkSync(filePath);
-      }
+      await processPdfBuffer(buffer, filename, campaignId, interaction);
       return;
     }
 
@@ -266,7 +188,7 @@ export default {
     }
 
     if (sub === 'view') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const doc = getDocument(id);
       if (!doc) return interaction.reply({ embeds: [errorEmbed('Not Found', 'Document not found.')], ephemeral: true });
@@ -295,7 +217,7 @@ export default {
     }
 
     if (sub === 'delete') {
-      const id = parseInt(interaction.options.getString('id'));
+      const id = parseInt(interaction.options.getString('id'), 10);
       if (isNaN(id)) return interaction.reply({ embeds: [errorEmbed('Invalid ID')], ephemeral: true });
       const doc = getDocument(id);
       if (!doc) return interaction.reply({ embeds: [errorEmbed('Not Found')], ephemeral: true });
@@ -306,8 +228,8 @@ export default {
     if (sub === 'convert') {
       await interaction.deferReply();
 
-      const docId = parseInt(interaction.options.getString('document-id'));
-      const campaignId = parseInt(interaction.options.getString('campaign-id'));
+      const docId = parseInt(interaction.options.getString('document-id'), 10);
+      const campaignId = parseInt(interaction.options.getString('campaign-id'), 10);
 
       if (isNaN(docId) || isNaN(campaignId)) {
         return interaction.editReply({ embeds: [errorEmbed('Invalid ID', 'Both document ID and campaign ID are required.')] });

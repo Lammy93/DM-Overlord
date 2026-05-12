@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DM-Overlord</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login-page">
+    <div id="login-page-box">
+      <img src="/img/logo.png" alt="DM-Overlord" style="max-width:200px;margin-bottom:0.3rem" />
+      <h1 id="login-page-title">DM-Overlord</h1>
+      <p id="login-page-subtitle" style="margin-bottom:1.5rem">Dungeon Master's Command Center</p>
+      <div id="login-page-tabs" class="login-tabs">
+        <button id="page-tab-player" class="login-tab active" data-tab="player">Player</button>
+        <button id="page-tab-dm" class="login-tab" data-tab="dm">Admin</button>
+      </div>
+      <div id="login-page-player" class="login-form">
+        <input type="text" id="page-login-username" placeholder="Username..." />
+        <input type="password" id="page-login-password-player" placeholder="Password..." />
+        <button id="page-login-btn-player">Login</button>
+        <div id="page-login-error-player" class="login-error"></div>
+      </div>
+      <div id="login-page-dm" class="login-form" style="display:none">
+        <input type="text" id="page-login-admin-user" placeholder="Username..." />
+        <input type="password" id="page-login-password" placeholder="Password..." />
+        <button id="page-login-btn">Login as Admin</button>
+        <div id="page-login-error" class="login-error"></div>
+      </div>
+    </div>
+  </div>
+
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <img src="/img/logo.png" alt="DM-Overlord" style="max-width:180px;cursor:pointer;display:block;margin:0 auto 0.8rem" onclick="location.hash='login'" />
+      <div id="auth-section" class="auth-section">
+        <div id="user-info" class="user-info" style="display:none">
+          <span id="user-role-badge" class="role-badge player-badge">Player</span>
+          <span id="user-display-name" style="font-size:0.75rem;color:var(--text-muted)"></span>
+          <button id="logout-btn" class="logout-btn">Logout</button>
+        </div>
+      </div>
+      <div id="guild-selector-wrap" class="guild-selector-wrap" style="display:none">
+        <select id="guild-select" class="guild-select">
+          <option value="">All Guilds</option>
+        </select>
+      </div>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-section-label dm-only" data-section="overview">Overview <span class="section-arrow">▼</span></li>
+      <li class="dm-only nav-item" data-section="overview"><a href="#dashboard" class="nav-link" data-page="dashboard">Dashboard</a></li>
+      <li class="dm-only nav-item" data-section="overview"><a href="#campaigns" class="nav-link" data-page="campaigns">Campaigns</a></li>
+      <li class="dm-only nav-item" data-section="overview"><a href="#activity" class="nav-link" data-page="activity">Activity</a></li>
+
+      <li class="nav-section-label dm-only" data-section="game">Game Management <span class="section-arrow">▼</span></li>
+      <li class="dm-only nav-item" data-section="game"><a href="#characters" class="nav-link" data-page="characters">Characters</a></li>
+      <li class="dm-only nav-item" data-section="game"><a href="#admin-characters" class="nav-link" data-page="admin-characters">Character Manager</a></li>
+      <li class="dm-only nav-item" data-section="game"><a href="#adventures" class="nav-link" data-page="adventures">Adventures</a></li>
+      <li class="dm-only nav-item" data-section="game"><a href="#encounters" class="nav-link" data-page="encounters">Encounters</a></li>
+      <li class="dm-only nav-item" data-section="game"><a href="#srd" class="nav-link" data-page="srd">SRD Browser</a></li>
+
+      <li class="nav-section-label player-only" data-section="player">Player Tools <span class="section-arrow">▼</span></li>
+      <li class="player-only nav-item" data-section="player"><a href="#roll" class="nav-link" data-page="roll">Dice Roller</a></li>
+      <li class="player-only nav-item" data-section="player"><a href="#maps" class="nav-link" data-page="maps">Maps</a></li>
+      <li class="player-only nav-item" data-section="player"><a href="#player-characters" class="nav-link" data-page="player-characters">My Characters</a></li>
+
+      <li class="nav-section-label" data-section="settings">Settings <span class="section-arrow">▼</span></li>
+      <li class="player-only nav-item" data-section="settings"><a href="#player-settings" class="nav-link" data-page="player-settings">My Settings</a></li>
+      <li class="dm-only nav-item" data-section="settings"><a href="#roles" class="nav-link" data-page="roles">Player Roles</a></li>
+      <li class="dm-only nav-item" data-section="settings"><a href="#settings" class="nav-link" data-page="settings">Server Settings</a></li>
+      <li class="dm-only nav-item" data-section="settings"><a href="#file-browser" class="nav-link" data-page="file-browser">File Browser</a></li>
+    </ul>
+  </nav>
+
+  <main id="content">
+    <div id="page-content"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
