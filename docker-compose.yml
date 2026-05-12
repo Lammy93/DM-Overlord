@@ -8,6 +8,10 @@ services:
     container_name: dm-overlord
     restart: unless-stopped
 
+    # Load Discord token and other secrets from .env file
+    # Change the path to match where your .env file is stored
+    env_file: ${ENV_FILE:-./.env}
+
     ports:
       - "3049:3049"
 
