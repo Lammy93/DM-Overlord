@@ -8,15 +8,14 @@ services:
     container_name: dm-overlord
     restart: unless-stopped
 
-    # Load Discord token and other secrets from .env file
-    # Change the path to match where your .env file is stored
-    env_file: ${ENV_FILE:-./.env}
-
     ports:
       - "3049:3049"
 
     environment:
-      # These defaults are used if not set in your env_file
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - GUILD_ID=${GUILD_ID}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - WEB_PORT=3049
       - WEB_HOST=0.0.0.0
       - NARRATION_STYLE=descriptive
