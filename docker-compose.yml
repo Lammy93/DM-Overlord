@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${WEB_PORT:-3049}:3049"
 
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
@@ -19,7 +19,8 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - AI_MODEL=${AI_MODEL:-gpt-4o-mini}
-      - WEB_PORT=${WEB_PORT:-3000}
+      - WEB_PORT=${WEB_PORT:-3049}
+      - WEB_HOST=${WEB_HOST:-0.0.0.0}
       # Obsidian vault path inside container (don't change)
       - OBSIDIAN_VAULT_PATH=/vault
       - OBSIDIAN_SUBFOLDER=DM-Overlord
