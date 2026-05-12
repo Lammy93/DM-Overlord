@@ -8,23 +8,21 @@ services:
     container_name: dm-overlord
     restart: unless-stopped
 
+    # Point to your .env file location (change path if needed)
+    env_file: ${ENV_FILE:-./.env}
+
     ports:
-      - "${WEB_PORT:-3049}:3049"
+      - "3049:3049"
 
     environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - CLIENT_ID=${CLIENT_ID}
-      - GUILD_ID=${GUILD_ID}
-      - NARRATION_STYLE=${NARRATION_STYLE:-descriptive}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - AI_MODEL=${AI_MODEL:-gpt-4o-mini}
-      - WEB_PORT=${WEB_PORT:-3049}
-      - WEB_HOST=${WEB_HOST:-0.0.0.0}
-      # Obsidian vault path inside container (don't change)
+      # These defaults are used if not set in your env_file
+      - WEB_PORT=3049
+      - WEB_HOST=0.0.0.0
+      - NARRATION_STYLE=descriptive
+      - LOG_LEVEL=info
+      - AI_MODEL=gpt-4o-mini
       - OBSIDIAN_VAULT_PATH=/vault
       - OBSIDIAN_SUBFOLDER=DM-Overlord
-      # Database path inside container (don't change)
       - DATABASE_PATH=/app/data/dm-overlord.db
 
     volumes:
