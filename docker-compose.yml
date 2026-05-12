@@ -1,8 +1,8 @@
 services:
   dm-overlord:
-    # Pull from GHCR (pre-built image)
+    # Pull from GHCR
     image: ghcr.io/lammy93/dm-overlord:latest
-    # To build locally instead: comment the line above, uncomment below
+    # To build locally:
     # build: .
 
     container_name: dm-overlord
